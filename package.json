@@ -1,16 +1,25 @@
 {
-  "name": "redbook",
+  "name": "@lucasygu/redbook",
   "version": "0.1.0",
   "description": "CLI tool for Xiaohongshu (Red Note) - read and post via private API",
   "type": "module",
   "main": "./dist/lib/client.js",
+  "exports": {
+    ".": "./dist/lib/client.js",
+    "./cookies": "./dist/lib/cookies.js",
+    "./signing": "./dist/lib/signing.js"
+  },
   "bin": {
     "redbook": "./dist/cli.js"
   },
+  "files": [
+    "dist/",
+    "LICENSE"
+  ],
   "scripts": {
     "build": "tsc && chmod +x dist/cli.js",
     "dev": "tsc --watch",
-    "prepare": "npm run build",
+    "prepublishOnly": "npm run build",
     "start": "node dist/cli.js"
   },
   "engines": {
@@ -20,9 +29,18 @@
     "xiaohongshu",
     "redbook",
     "xhs",
+    "red-note",
     "cli"
   ],
+  "author": "lucasygu",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lucasygu/redbook.git"
+  },
+  "bugs": {
+    "url": "https://github.com/lucasygu/redbook/issues"
+  },
   "dependencies": {
     "@steipete/sweet-cookie": "^0.1.0",
     "commander": "^13.1.0",

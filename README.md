@@ -89,6 +89,19 @@ redbook post --title "测试" --body "..." --images img.png --private
 - **主 API**（`edith.xiaohongshu.com`）—— 读取：搜索、推荐页、笔记、评论、用户资料。使用 144 字节 x-s 签名（v4.3.1）
 - **创作者 API**（`creator.xiaohongshu.com`）—— 写入：上传图片、发布笔记。使用 AES-128-CBC 签名
 
+## Claude Code 集成
+
+安装后自动注册为 Claude Code 技能。在 Claude Code 中使用 `/redbook` 命令：
+
+```
+/redbook search "AI编程"              # 搜索笔记
+/redbook read <url>                   # 阅读笔记
+/redbook user <userId>                # 查看博主
+/redbook analyze <userId>             # 完整博主分析
+```
+
+Claude 会自动调用 CLI 命令，解析结果，完成竞品分析、话题研究等复杂任务。
+
 ## 编程接口
 
 ```typescript
@@ -208,6 +221,19 @@ redbook post --title "测试" --body "..." --images img.png --private
 **Two signing systems:**
 - **Main API** (`edith.xiaohongshu.com`) — for reading: search, feed, notes, comments, user profiles. Uses x-s signature with 144-byte payload (v4.3.1).
 - **Creator API** (`creator.xiaohongshu.com`) — for writing: upload images, publish notes. Uses simpler AES-128-CBC signing.
+
+## Claude Code Integration
+
+Installs automatically as a Claude Code skill. Use `/redbook` in Claude Code:
+
+```
+/redbook search "AI编程"              # Search notes
+/redbook read <url>                   # Read a note
+/redbook user <userId>                # Creator profile
+/redbook analyze <userId>             # Full creator analysis
+```
+
+Claude will call CLI commands, parse results, and handle complex workflows like competitive analysis and topic research.
 
 ## Programmatic Usage
 

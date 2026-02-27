@@ -10,7 +10,7 @@
     "./signing": "./dist/lib/signing.js"
   },
   "bin": {
-    "redbook": "./dist/cli.js"
+    "redbook": "dist/cli.js"
   },
   "files": [
     "dist/",

@@ -3,10 +3,10 @@
  *
  * Generates x-s, x-s-common, x-t, x-b3-traceid, x-xray-traceid headers.
  *
- * Algorithm overview:
+ * Algorithm overview (v4.3.1, 144-byte payload):
  *   1. MD5 hash of content string (URI + params/body)
- *   2. Build 124-byte binary payload array
- *   3. XOR with static 124-byte hex key
+ *   2. Build 144-byte binary payload array (with a3 hash segment)
+ *   3. XOR with static 144-byte hex key
  *   4. Custom Base64 encode (shuffled alphabet)
  *   5. Wrap in JSON envelope → another custom Base64 → XYS_ prefix
  *
@@ -25,16 +25,19 @@ const X3_BASE64 =
   "MfgqrsbcyzPQRStuvC7mn501HIJBo2DEFTKdeNOwxWXYZap89+/A4UVLhijkl63G";
 
 const HEX_KEY =
-  "71a302257793271ddd273bcee3e4b98d9d7935e1da33f5765e2ea8afb6dc77a51a499d23b67c20660025860cbf13d4540d92497f58686c574e508f46e1956344f39139bf4faf22a3eef120b79258145b2feb5193b6478669961298e79bedca646e1a693a926154a5a7a1bd1cf0dedb742f917a747a1e388b234f2277";
+  "71a302257793271ddd273bcee3e4b98d9d7935e1da33f5765e2ea8afb6dc77a51a499d23b67c20660025860cbf13d4540d92497f58686c574e508f46e1956344f39139bf4faf22a3eef120b79258145b2feb5193b6478669961298e79bedca646e1a693a926154a5a7a1bd1cf0dedb742f917a747a1e388b234f2277516db7116035439730fa61e9822a0eca7bff72d8";
 
-const VERSION_BYTES = [119, 104, 96, 41];
-const CHECKSUM_VERSION = 1;
-const CHECKSUM_XOR_KEY = 115;
-const CHECKSUM_FIXED_TAIL = [
-  249, 65, 103, 103, 201, 181, 131, 99, 94, 7, 68, 250, 132, 21,
-];
+const VERSION_BYTES = [121, 104, 96, 41];
+const PAYLOAD_LENGTH = 144;
 
-const ENV_FINGERPRINT_XOR_KEY = 41;
+// Environment detection constants (part11)
+const ENV_TABLE = [115, 248, 83, 102, 103, 201, 181, 131, 99, 94, 4, 68, 250, 132, 21];
+const ENV_CHECKS_DEFAULT = [0, 1, 18, 1, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0];
+
+// A3 hash segment constants
+const A3_PREFIX = [2, 97, 51, 16];
+const HASH_IV: [number, number, number, number] = [1831565813, 461845907, 2246822507, 3266489909];
+const MAX_32BIT = 0xFFFFFFFF;
 
 const SDK_VERSION = "4.2.6";
 const APP_ID = "xhs-pc-web";
@@ -122,17 +125,17 @@ function randomUint32(): number {
 }
 
 function intToLeBytes(val: number, length: number = 4): number[] {
-  const arr: number[] = [];
-  for (let i = 0; i < length; i++) {
-    arr.push(val & 0xff);
-    val = val >>> 8;
+  if (length <= 4) {
+    const arr: number[] = [];
+    for (let i = 0; i < length; i++) {
+      arr.push(val & 0xff);
+      val = val >>> 8;
+    }
+    return arr;
   }
-  return arr;
-}
-
-function int64ToLeBytes(val: bigint): number[] {
-  const buf = Buffer.alloc(8);
-  buf.writeBigUInt64LE(val);
+  // For 8-byte values, use BigInt to avoid JS number precision issues
+  const buf = Buffer.alloc(length);
+  buf.writeBigUInt64LE(BigInt(val));
   return Array.from(buf);
 }
 
@@ -144,29 +147,66 @@ function hexToBytes(hex: string): Uint8Array {
   return bytes;
 }
 
-// ─── Environment Fingerprints ────────────────────────────────────────────────
+// ─── A3 Hash Functions ──────────────────────────────────────────────────────
 
-function envFingerprintA(ts: bigint, xorKey: number): number[] {
-  const data = Buffer.alloc(8);
-  data.writeBigUInt64LE(ts);
-
-  let sum1 = 0;
-  for (let i = 1; i <= 4; i++) sum1 += data[i];
-  let sum2 = 0;
-  for (let i = 5; i <= 7; i++) sum2 += data[i];
-
-  const mark = ((sum1 & 0xff) + sum2) & 0xff;
-  data[0] = mark;
-
-  for (let i = 0; i < data.length; i++) {
-    data[i] ^= xorKey;
-  }
-
-  return Array.from(data);
+function rotateLeft(val: number, n: number): number {
+  return ((val << n) | (val >>> (32 - n))) >>> 0;
 }
 
-function envFingerprintB(ts: bigint): number[] {
-  return int64ToLeBytes(ts);
+function customHashV2(inputBytes: number[]): number[] {
+  let [s0, s1, s2, s3] = HASH_IV;
+  const length = inputBytes.length;
+
+  s0 = (s0 ^ length) >>> 0;
+  s1 = (s1 ^ ((length << 8) & MAX_32BIT)) >>> 0;
+  s2 = (s2 ^ ((length << 16) & MAX_32BIT)) >>> 0;
+  s3 = (s3 ^ ((length << 24) & MAX_32BIT)) >>> 0;
+
+  const buf = Buffer.from(inputBytes);
+  for (let i = 0; i < Math.floor(length / 8); i++) {
+    const v0 = buf.readUInt32LE(i * 8);
+    const v1 = buf.readUInt32LE(i * 8 + 4);
+
+    s0 = rotateLeft(((s0 + v0) & MAX_32BIT) ^ s2, 7);
+    s1 = rotateLeft(((v0 ^ s1) + s3) & MAX_32BIT, 11);
+    s2 = rotateLeft(((s2 + v1) & MAX_32BIT) ^ s0, 13);
+    s3 = rotateLeft(((s3 ^ v1) + s1) & MAX_32BIT, 17);
+  }
+
+  const t0 = (s0 ^ length) >>> 0;
+  const t1 = (s1 ^ t0) >>> 0;
+  const t2 = ((s2 + t1) & MAX_32BIT) >>> 0;
+  const t3 = (s3 ^ t2) >>> 0;
+
+  const rot_t0 = rotateLeft(t0, 9);
+  const rot_t1 = rotateLeft(t1, 13);
+  const rot_t2 = rotateLeft(t2, 17);
+  const rot_t3 = rotateLeft(t3, 19);
+
+  s0 = ((rot_t0 + rot_t2) & MAX_32BIT) >>> 0;
+  s1 = (rot_t1 ^ rot_t3) >>> 0;
+  s2 = ((rot_t2 + s0) & MAX_32BIT) >>> 0;
+  s3 = (rot_t3 ^ s1) >>> 0;
+
+  const result: number[] = [];
+  for (const s of [s0, s1, s2, s3]) {
+    result.push(...intToLeBytes(s, 4));
+  }
+  return result;
+}
+
+function extractApiPath(uriWithData: string): string {
+  const bracePos = uriWithData.indexOf("{");
+  const questionPos = uriWithData.indexOf("?");
+
+  if (bracePos !== -1 && questionPos !== -1) {
+    return uriWithData.substring(0, Math.min(bracePos, questionPos));
+  } else if (bracePos !== -1) {
+    return uriWithData.substring(0, bracePos);
+  } else if (questionPos !== -1) {
+    return uriWithData.substring(0, questionPos);
+  }
+  return uriWithData;
 }
 
 // ─── Payload Builder ────────────────────────────────────────────────────────
@@ -190,26 +230,27 @@ function buildPayloadArray(
 
   // Timestamp
   const ts = timestamp ?? Date.now() / 1000;
-  const tsMs = BigInt(Math.floor(ts * 1000));
+  const tsMs = Math.floor(ts * 1000);
 
-  // Environment fingerprint A [8-15]
-  payload.push(...envFingerprintA(tsMs, ENV_FINGERPRINT_XOR_KEY));
+  // Timestamp bytes [8-15] — raw LE int64 (no XOR in v4.3.1)
+  const tsBytes = intToLeBytes(tsMs, 8);
+  payload.push(...tsBytes);
 
-  // Environment fingerprint B [16-23] (page load time)
+  // Page load timestamp [16-23]
   const timeOffset = randomInt(10, 50);
-  const pageLoadTs = BigInt(Math.floor((ts - timeOffset) * 1000));
-  payload.push(...envFingerprintB(pageLoadTs));
+  const pageLoadTs = Math.floor((ts - timeOffset) * 1000);
+  payload.push(...intToLeBytes(pageLoadTs, 8));
 
   // Sequence counter [24-27]
   const sequenceValue = randomInt(15, 50);
   payload.push(...intToLeBytes(sequenceValue, 4));
 
   // Window props length [28-31]
-  const windowPropsLength = randomInt(900, 1200);
+  const windowPropsLength = randomInt(1000, 1200);
   payload.push(...intToLeBytes(windowPropsLength, 4));
 
-  // URI content length [32-35]
-  payload.push(...intToLeBytes(contentString.length, 4));
+  // URI content length [32-35] — UTF-8 byte length (not char count)
+  payload.push(...intToLeBytes(Buffer.byteLength(contentString, "utf-8"), 4));
 
   // MD5 XOR segment [36-43]
   const md5Bytes = hexToBytes(hexParameter);
@@ -235,13 +276,26 @@ function buildPayloadArray(
     payload.push(i < sourceBytes.length ? sourceBytes[i] : 0);
   }
 
-  // Fixed byte [108]
-  payload.push(1);
+  // Part 11: Environment detection [108-123] (16 bytes)
+  payload.push(1); // env marker
+  payload.push(seedByte0 ^ ENV_TABLE[0]); // seed ^ ENV_TABLE[0]
+  for (let i = 1; i < 15; i++) {
+    payload.push(ENV_TABLE[i] ^ ENV_CHECKS_DEFAULT[i]);
+  }
 
-  // Checksum block [109-124]
-  payload.push(CHECKSUM_VERSION);
-  payload.push(seedByte0 ^ CHECKSUM_XOR_KEY);
-  payload.push(...CHECKSUM_FIXED_TAIL);
+  // A3 segment [124-143] (20 bytes) — new in v4.3.1
+  const apiPath = extractApiPath(contentString);
+  const apiPathMd5 = crypto.createHash("md5").update(apiPath, "utf-8").digest("hex");
+  const md5PathBytes: number[] = [];
+  for (let i = 0; i < 32; i += 2) {
+    md5PathBytes.push(parseInt(apiPathMd5.substring(i, i + 2), 16));
+  }
+  const hashInput = [...tsBytes, ...md5PathBytes]; // 8 + 16 = 24 bytes
+  const hashOutput = customHashV2(hashInput);
+  payload.push(...A3_PREFIX);
+  for (const b of hashOutput) {
+    payload.push(b ^ seedByte0);
+  }
 
   return payload;
 }
@@ -604,7 +658,7 @@ export function signMainApi(
   // Build payload array and sign
   const payloadArray = buildPayloadArray(dValue, a1, contentString, ts);
   const xorResult = xorTransform(payloadArray);
-  const x3Signature = x3Base64Encode(xorResult.slice(0, 124));
+  const x3Signature = x3Base64Encode(xorResult.slice(0, PAYLOAD_LENGTH));
 
   // Build x-s
   const signatureData = { ...SIGNATURE_DATA_TEMPLATE };

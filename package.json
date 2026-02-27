@@ -1,6 +1,6 @@
 {
   "name": "@lucasygu/redbook",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "CLI tool for Xiaohongshu (Red Note) - read and post via private API",
   "type": "module",
   "main": "./dist/lib/client.js",
@@ -14,6 +14,8 @@
   },
   "files": [
     "dist/",
+    "scripts/",
+    "SKILL.md",
     "LICENSE",
     "README.md"
   ],
@@ -21,6 +23,8 @@
     "build": "tsc && chmod +x dist/cli.js",
     "dev": "tsc --watch",
     "prepublishOnly": "npm run build",
+    "postinstall": "node scripts/postinstall.js",
+    "preuninstall": "node scripts/preuninstall.js",
     "start": "node dist/cli.js"
   },
   "engines": {
@@ -31,7 +35,9 @@
     "redbook",
     "xhs",
     "red-note",
-    "cli"
+    "cli",
+    "claude-code",
+    "claude-code-skill"
   ],
   "author": "lucasygu",
   "license": "MIT",

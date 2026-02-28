@@ -55,6 +55,7 @@ redbook post --title "测试" --body "..." --images img.png --private
 | `feed` | 获取推荐页内容 |
 | `post` | 发布图文笔记 |
 | `topics <关键词>` | 搜索话题/标签 |
+| `analyze-viral <url>` | 分析爆款笔记（钩子、互动、结构） |
 
 ### 通用选项
 
@@ -188,6 +189,7 @@ redbook post --title "测试" --body "..." --images img.png --private
 | `feed` | Get homepage feed |
 | `post` | Publish an image note |
 | `topics <keyword>` | Search for topics/hashtags |
+| `analyze-viral <url>` | Analyze why a viral note works (hooks, engagement, structure) |
 
 ### Global Options
 

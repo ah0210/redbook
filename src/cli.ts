@@ -19,6 +19,7 @@ import { Command } from "commander";
 import kleur from "kleur";
 import { extractCookies, type CookieSource } from "./lib/cookies.js";
 import { XhsClient, XhsApiError } from "./lib/client.js";
+import { analyzeViral, formatViralAnalysis } from "./lib/analyze.js";
 
 const program = new Command();
 
@@ -403,6 +404,120 @@ topicsCmd.action(async (keyword, opts) => {
           `#${kleur.bold(topic.name ?? "?")}  ${kleur.dim(`id:${topic.id ?? "?"}`)}  ${kleur.dim(`views:${topic.view_num ?? "?"}`)}`
         );
       }
+    }
+  } catch (err) {
+    handleError(err);
+  }
+});
+
+// ─── analyze-viral ──────────────────────────────────────────────────────────
+
+const analyzeViralCmd = program
+  .command("analyze-viral <url>")
+  .description("Analyze why a viral note works — hooks, engagement, structure");
+analyzeViralCmd.option("--comment-pages <n>", "Comment pages to fetch (max 10)", "3");
+addCookieOption(analyzeViralCmd);
+addJsonOption(analyzeViralCmd);
+
+analyzeViralCmd.action(async (url, opts) => {
+  try {
+    const client = await getClient(opts.cookieSource);
+    const { noteId, xsecToken } = parseNoteUrl(url);
+
+    // 1. Fetch the note (same pattern as `read` — prefer HTML, API when xsec_token present)
+    let note: Record<string, unknown>;
+    if (xsecToken) {
+      try {
+        const feedResult = (await client.getNoteById(
+          noteId,
+          xsecToken
+        )) as { items?: Array<{ note_card?: Record<string, unknown> }> };
+        note = feedResult?.items?.[0]?.note_card ?? {};
+        if (!note.user) {
+          note = (await client.getNoteFromHtml(noteId, xsecToken)) as Record<string, unknown>;
+        }
+      } catch {
+        note = (await client.getNoteFromHtml(noteId, xsecToken)) as Record<string, unknown>;
+      }
+    } else {
+      note = (await client.getNoteFromHtml(noteId, "")) as Record<string, unknown>;
+    }
+
+    const user = (note.user as Record<string, unknown>) ?? {};
+    const userId = String(user.user_id ?? "");
+
+    if (!userId) {
+      console.error(kleur.red("Could not extract author user_id from note"));
+      process.exit(1);
+    }
+
+    // 2. Fetch comments, author posts, and author info in parallel
+    const commentPages = Math.min(parseInt(opts.commentPages) || 3, 10);
+
+    const fetchComments = async () => {
+      const all: Record<string, unknown>[] = [];
+      let cursor = "";
+      for (let i = 0; i < commentPages; i++) {
+        try {
+          const res = (await client.getComments(noteId, cursor, xsecToken ?? "")) as {
+            comments?: Record<string, unknown>[];
+            has_more?: boolean;
+            cursor?: string;
+          };
+          if (res.comments) all.push(...res.comments);
+          if (!res.has_more) break;
+          cursor = res.cursor ?? "";
+        } catch {
+          break; // Comment fetch failed, continue with what we have
+        }
+      }
+      return all;
+    };
+
+    const fetchAuthorPosts = async () => {
+      try {
+        const res = (await client.getUserNotes(userId)) as {
+          notes?: Record<string, unknown>[];
+        };
+        return res.notes ?? [];
+      } catch {
+        return [];
+      }
+    };
+
+    const fetchAuthorInfo = async () => {
+      try {
+        const res = (await client.getUserInfo(userId)) as Record<string, unknown>;
+        // Follower count is in interactions array: {type: "fans", count: "30510"}
+        const interactions = (res.interactions ?? []) as Array<{ type?: string; count?: string }>;
+        const fansEntry = interactions.find((i) => i.type === "fans");
+        if (fansEntry?.count) {
+          // Handle Chinese abbreviated numbers (e.g., "3.1万")
+          const s = fansEntry.count.trim();
+          if (s.endsWith("万")) return Math.round(parseFloat(s.slice(0, -1)) * 10000);
+          if (s.endsWith("亿")) return Math.round(parseFloat(s.slice(0, -1)) * 100000000);
+          return parseInt(s, 10) || 0;
+        }
+        return 0;
+      } catch {
+        return 0;
+      }
+    };
+
+    console.error(kleur.dim("Fetching comments, author posts, and profile..."));
+    const [comments, authorPosts, authorFollowers] = await Promise.all([
+      fetchComments(),
+      fetchAuthorPosts(),
+      fetchAuthorInfo(),
+    ]);
+
+    // 3. Run analysis
+    const analysis = analyzeViral(noteId, note, comments, authorPosts, authorFollowers);
+
+    if (opts.json) {
+      output(analysis, true);
+    } else {
+      console.log(formatViralAnalysis(analysis));
     }
   } catch (err) {
     handleError(err);

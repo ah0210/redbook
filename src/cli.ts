@@ -17,16 +17,22 @@
 
 import { Command } from "commander";
 import kleur from "kleur";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
 import { extractCookies, type CookieSource } from "./lib/cookies.js";
 import { XhsClient, XhsApiError } from "./lib/client.js";
 import { analyzeViral, formatViralAnalysis } from "./lib/analyze.js";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const pkg = JSON.parse(readFileSync(join(__dirname, "..", "package.json"), "utf-8"));
 
 const program = new Command();
 
 program
   .name("redbook")
   .description("CLI tool for Xiaohongshu (Red Note)")
-  .version("0.1.0");
+  .version(pkg.version);
 
 // Global option for cookie source
 function addCookieOption(cmd: Command): Command {

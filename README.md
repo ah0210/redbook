@@ -4,6 +4,14 @@
 
 [English](#english) | 中文
 
+> ### 最快上手方式
+>
+> 把这段话发给你的 AI 助手（Claude Code、Cursor、Codex、Windsurf 等）：
+>
+> **"帮我安装 `@lucasygu/redbook` 这个小红书 CLI 工具，然后运行 `redbook whoami` 验证是否能正常连接。GitHub 地址：https://github.com/lucasygu/redbook"**
+>
+> AI 会自动完成安装、验证连接、处理可能的 Cookie 问题。你只需要确保已在 Chrome 中登录 xiaohongshu.com。
+
 ## 安装
 
 ```bash
@@ -11,6 +19,8 @@ npm install -g @lucasygu/redbook
 ```
 
 需要 Node.js >= 22。使用 Chrome 浏览器的 Cookie —— 请先在 Chrome 中登录 xiaohongshu.com。
+
+安装后运行 `redbook whoami` 验证连接。如果遇到 macOS 钥匙串弹窗，请点击"始终允许"。CLI 会自动检测所有 Chrome 配置文件，找到你的小红书登录状态。
 
 ## 快速开始
 
@@ -37,6 +47,9 @@ redbook user-posts <userId>
 # 搜索话题标签
 redbook topics "Claude Code"
 
+# 分析爆款笔记
+redbook analyze-viral https://www.xiaohongshu.com/explore/abc123
+
 # 发布图文笔记
 redbook post --title "标题" --body "正文内容" --images cover.png
 redbook post --title "测试" --body "..." --images img.png --private
@@ -61,7 +74,8 @@ redbook post --title "测试" --body "..." --images img.png --private
 
 | 选项 | 说明 | 默认值 |
 |------|------|--------|
-| `--cookie-source <浏览器>` | Cookie 来源浏览器 | `chrome` |
+| `--cookie-source <浏览器>` | Cookie 来源浏览器（chrome, safari, firefox） | `chrome` |
+| `--chrome-profile <名称>` | Chrome 配置文件目录名（如 "Profile 1"），默认自动检测 | 自动 |
 | `--json` | JSON 格式输出 | `false` |
 
 ### 搜索选项
@@ -81,6 +95,15 @@ redbook post --title "测试" --body "..." --images img.png --private
 | `--images <路径...>` | 图片文件路径（必填） |
 | `--topic <关键词>` | 附加话题标签 |
 | `--private` | 发布为私密笔记 |
+
+## 常见问题
+
+| 问题 | 解决方案 |
+|------|----------|
+| `No 'a1' cookie found` | 在 Chrome 中登录 xiaohongshu.com，然后重试 |
+| macOS 钥匙串弹窗 | 输入密码后点击"始终允许"，CLI 需要读取 Chrome 的加密 Cookie |
+| 多个 Chrome 配置文件 | CLI 自动扫描所有配置文件。如需指定：`--chrome-profile "Profile 1"` |
+| 使用 Brave/Arc 等浏览器 | 尝试 `--cookie-source safari`，或在 Chrome 中登录 |
 
 ## 工作原理
 
@@ -138,6 +161,14 @@ Cookie 提取使用 [@steipete/sweet-cookie](https://github.com/nicklockwood/swe
 
 A fast CLI tool for [Xiaohongshu (小红书 / RED)](https://www.xiaohongshu.com) — search notes, read content, analyze creators, and publish posts. Uses browser cookie auth (no API key needed).
 
+> ### Easiest way to get started
+>
+> Paste this to your AI coding agent (Claude Code, Cursor, Codex, Windsurf, etc.):
+>
+> **"Install the `@lucasygu/redbook` Xiaohongshu CLI tool and run `redbook whoami` to verify it works. Repo: https://github.com/lucasygu/redbook"**
+>
+> The agent will handle installation, verify the connection, and troubleshoot any cookie issues. Just make sure you're logged into xiaohongshu.com in Chrome first.
+
 ## Install
 
 ```bash
@@ -145,6 +176,8 @@ npm install -g @lucasygu/redbook
 ```
 
 Requires Node.js >= 22. Uses cookies from your Chrome browser session — you must be logged into xiaohongshu.com in Chrome.
+
+After installing, run `redbook whoami` to verify the connection. If macOS shows a Keychain prompt, click "Always Allow". The CLI auto-detects all Chrome profiles to find your XHS session.
 
 ## Quick Start
 
@@ -171,6 +204,9 @@ redbook user-posts <userId>
 # Search hashtags
 redbook topics "Claude Code"
 
+# Analyze a viral note
+redbook analyze-viral https://www.xiaohongshu.com/explore/abc123
+
 # Publish (requires image)
 redbook post --title "标题" --body "正文" --images cover.png
 redbook post --title "测试" --body "..." --images img.png --private
@@ -195,7 +231,8 @@ redbook post --title "测试" --body "..." --images img.png --private
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `--cookie-source <browser>` | Browser to read cookies from | `chrome` |
+| `--cookie-source <browser>` | Browser to read cookies from (chrome, safari, firefox) | `chrome` |
+| `--chrome-profile <name>` | Chrome profile directory name (e.g., "Profile 1"). Auto-detected if omitted. | auto |
 | `--json` | Output as JSON | `false` |
 
 ### Search Options
@@ -215,6 +252,15 @@ redbook post --title "测试" --body "..." --images img.png --private
 | `--images <paths...>` | Image file paths (required) |
 | `--topic <keyword>` | Topic/hashtag to search and attach |
 | `--private` | Publish as private note |
+
+## Troubleshooting
+
+| Problem | Solution |
+|---------|----------|
+| `No 'a1' cookie found` | Log into xiaohongshu.com in Chrome, then retry |
+| macOS Keychain prompt | Enter your password and click "Always Allow" — the CLI needs to decrypt Chrome's cookies |
+| Multiple Chrome profiles | The CLI auto-scans all profiles. To pick one: `--chrome-profile "Profile 1"` |
+| Using Brave/Arc/other | Try `--cookie-source safari`, or log into xiaohongshu.com in Chrome |
 
 ## How It Works
 

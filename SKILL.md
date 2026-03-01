@@ -165,6 +165,7 @@ redbook post --title "测试" --body "..." --images img.png --private --json
 
 All commands accept:
 - `--cookie-source <browser>`: `chrome` (default), `safari`, `firefox`
+- `--chrome-profile <name>`: Chrome profile directory name (e.g., "Profile 1"). Auto-discovered if omitted.
 - `--json`: Output as JSON
 
 ## Research Workflows

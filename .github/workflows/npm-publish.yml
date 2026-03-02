@@ -7,6 +7,7 @@ on:
       - 'src/**'
       - 'package.json'
       - 'tsconfig.json'
+      - 'SKILL.md'
       - '!package-lock.json'
 
   # Allow manual trigger
@@ -100,6 +101,53 @@ jobs:
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  check-skill:
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.skill-check.outputs.changed }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Check if SKILL.md changed
+        id: skill-check
+        run: |
+          if git diff --name-only HEAD~1 HEAD | grep -q "^SKILL.md$"; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "SKILL.md changed"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "SKILL.md unchanged"
+          fi
+
+  clawhub-publish:
+    needs: [build, check-skill, check-version]
+    if: needs.check-skill.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install clawhub CLI
+        run: npm install -g clawhub
+
+      - name: Authenticate with ClawHub
+        env:
+          CLAWHUB_TOKEN: ${{ secrets.CLAWHUB_TOKEN }}
+        run: clawhub login --token "$CLAWHUB_TOKEN" --no-browser
+
+      - name: Publish to ClawHub
+        env:
+          SKILL_VERSION: ${{ needs.check-version.outputs.current }}
+        run: clawhub publish . --slug redbook --name "redbook" --version "$SKILL_VERSION"
 
   skip:
     needs: [build, check-version]

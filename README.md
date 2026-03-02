@@ -29,6 +29,8 @@ npm install -g @lucasygu/redbook
 - **话题研究** —— 搜索关键词，分析哪些话题有流量、哪些是蓝海
 - **竞品分析** —— 找到头部博主，对比粉丝量、互动数据、内容风格
 - **爆款拆解** —— 分析爆款笔记的标题钩子、互动比例、评论主题
+- **爆款模板** —— 从多篇爆款笔记提取内容模板（标题结构、正文结构、钩子模式）
+- **评论管理** —— 发评论、回复评论、按策略批量回复（问题优先 / 高赞优先 / 未回复优先）
 - **内容策划** —— 基于数据发现内容机会，生成有数据支撑的选题建议
 - **受众洞察** —— 从互动信号推断目标用户画像
 
@@ -62,6 +64,19 @@ redbook topics "Claude Code"
 # 分析爆款笔记
 redbook analyze-viral https://www.xiaohongshu.com/explore/abc123
 
+# 从多篇爆款提取内容模板
+redbook viral-template "<url1>" "<url2>" "<url3>" --json
+
+# 发评论
+redbook comment "<noteUrl>" --content "写得好！"
+
+# 回复评论
+redbook reply "<noteUrl>" --comment-id "<id>" --content "感谢提问！"
+
+# 按策略批量回复（先预览再执行）
+redbook batch-reply "<noteUrl>" --strategy questions --dry-run
+redbook batch-reply "<noteUrl>" --strategy questions --template "感谢！{content}" --max 10
+
 # 发布图文笔记
 redbook post --title "标题" --body "正文内容" --images cover.png
 redbook post --title "测试" --body "..." --images img.png --private
@@ -81,6 +96,10 @@ redbook post --title "测试" --body "..." --images img.png --private
 | `post` | 发布图文笔记（易触发验证码，详见下方说明） |
 | `topics <关键词>` | 搜索话题/标签 |
 | `analyze-viral <url>` | 分析爆款笔记（钩子、互动、结构） |
+| `viral-template <url...>` | 从 1-3 篇爆款笔记提取内容模板 |
+| `comment <url>` | 发表评论 |
+| `reply <url>` | 回复指定评论 |
+| `batch-reply <url>` | 按策略批量回复评论（支持预览模式） |
 
 ### 通用选项
 
@@ -98,11 +117,21 @@ redbook post --title "测试" --body "..." --images img.png --private
 | `--type <类型>` | `all`（全部）、`video`（视频）、`image`（图文） | `all` |
 | `--page <页码>` | 页码 | `1` |
 
-### 分析选项（analyze-viral）
+### 分析选项（analyze-viral / viral-template）
 
 | 选项 | 说明 | 默认值 |
 |------|------|--------|
 | `--comment-pages <n>` | 获取评论页数 | `3` |
+
+### 批量回复选项（batch-reply）
+
+| 选项 | 说明 | 默认值 |
+|------|------|--------|
+| `--strategy <策略>` | `questions`（提问）、`top-engaged`（高赞）、`all-unanswered`（未回复） | `questions` |
+| `--template <模板>` | 回复模板，支持 `{author}`, `{content}` 占位符 | 无（预览模式） |
+| `--max <数量>` | 最大回复数（上限 50） | `10` |
+| `--delay <毫秒>` | 回复间隔（最小 2000ms） | `3000` |
+| `--dry-run` | 只预览不发送 | 无模板时自动开启 |
 
 ### 发布选项（post）
 
@@ -133,7 +162,29 @@ redbook post --title "测试" --body "..." --images img.png --private
 - **主 API**（`edith.xiaohongshu.com`）—— 读取：搜索、推荐页、笔记、评论、用户资料。使用 144 字节 x-s 签名（v4.3.1）
 - **创作者 API**（`creator.xiaohongshu.com`）—— 写入：上传图片、发布笔记。使用 AES-128-CBC 签名
 
-## Claude Code 集成
+## 分析模块（A-K）
+
+内置 11 个可组合的分析模块，覆盖从关键词研究到自动化运营的完整工作流：
+
+| 模块 | 功能 |
+|------|------|
+| A. 关键词矩阵 | 分析各关键词的互动天花板和竞争密度 |
+| B. 跨话题热力图 | 发现话题 × 场景的内容空白 |
+| C. 互动信号分析 | 分类内容类型（工具型 / 认知型 / 娱乐型） |
+| D. 博主画像 | 对比头部博主的粉丝、互动、风格 |
+| E. 内容形式分析 | 图文 vs. 视频的表现对比 |
+| F. 机会评分 | 按性价比排序关键词 |
+| G. 受众推断 | 从互动信号推断用户画像 |
+| H. 选题策划 | 数据驱动的内容创意 |
+| I. 评论运营 | 按策略筛选和批量回复评论 |
+| J. 爆款复刻 | 从爆款笔记提取内容模板 |
+| K. 互动自动化 | 组合 I + J 的自动化运营工作流 |
+
+详见 [SKILL.md](SKILL.md) 的模块文档和组合工作流。
+
+## AI 助手集成
+
+### Claude Code
 
 安装后自动注册为 Claude Code 技能。在 Claude Code 中使用 `/redbook` 命令：
 
@@ -144,13 +195,24 @@ redbook post --title "测试" --body "..." --images img.png --private
 /redbook analyze-viral <url>                    # 分析爆款笔记
 ```
 
-技能内置了小红书平台专属的分析模块 —— 关键词矩阵、跨话题热力图、互动信号分类、博主画像、内容机会评分等。你可以直接用自然语言下达复杂任务：
+你可以直接用自然语言下达复杂任务：
 
 - *"分析'AI编程'在小红书的竞争格局，找出蓝海关键词"*
 - *"对比这三个博主的内容策略和互动数据"*
 - *"拆解这篇爆款笔记，告诉我为什么火了"*
+- *"帮我回复这篇笔记下面的提问评论"*
 
 Claude 会自动组合多个命令，解析 JSON 数据，输出结构化分析报告。
+
+### OpenClaw / ClawHub
+
+官方支持 [OpenClaw](https://openclaw.ai) 和 [ClawHub](https://docs.openclaw.ai/tools/clawhub) 生态。通过 ClawHub 安装：
+
+```bash
+clawhub install redbook
+```
+
+安装后在 OpenClaw 中可直接使用所有 `redbook` 命令。SKILL.md 同时兼容 Claude Code 和 OpenClaw 两个生态。
 
 ## 编程接口
 
@@ -212,6 +274,8 @@ After installing, run `redbook whoami` to verify the connection. If macOS shows 
 - **Topic research** — Search keywords, analyze which topics have demand vs. gaps
 - **Competitive analysis** — Find top creators, compare followers, engagement, content style
 - **Viral note breakdown** — Analyze title hooks, engagement ratios, comment themes
+- **Viral templates** — Extract content templates from multiple viral notes (hook patterns, body structure, engagement profile)
+- **Comment management** — Post comments, reply to comments, batch-reply with strategies (questions / top-engaged / unanswered)
 - **Content planning** — Discover content opportunities with data-backed topic suggestions
 - **Audience insights** — Infer target audience from engagement signals
 
@@ -245,6 +309,19 @@ redbook topics "Claude Code"
 # Analyze a viral note
 redbook analyze-viral https://www.xiaohongshu.com/explore/abc123
 
+# Extract content template from viral notes
+redbook viral-template "<url1>" "<url2>" "<url3>" --json
+
+# Post a comment
+redbook comment "<noteUrl>" --content "Great post!"
+
+# Reply to a comment
+redbook reply "<noteUrl>" --comment-id "<id>" --content "Thanks for asking!"
+
+# Batch reply with strategy (preview first, then execute)
+redbook batch-reply "<noteUrl>" --strategy questions --dry-run
+redbook batch-reply "<noteUrl>" --strategy questions --template "Thanks! {content}" --max 10
+
 # Publish (requires image)
 redbook post --title "标题" --body "正文" --images cover.png
 redbook post --title "测试" --body "..." --images img.png --private
@@ -264,6 +341,10 @@ redbook post --title "测试" --body "..." --images img.png --private
 | `post` | Publish an image note (captcha-prone, see below) |
 | `topics <keyword>` | Search for topics/hashtags |
 | `analyze-viral <url>` | Analyze why a viral note works (hooks, engagement, structure) |
+| `viral-template <url...>` | Extract a content template from 1-3 viral notes |
+| `comment <url>` | Post a top-level comment |
+| `reply <url>` | Reply to a specific comment |
+| `batch-reply <url>` | Batch reply to comments with filtering strategy (supports dry-run) |
 
 ### Global Options
 
@@ -281,11 +362,21 @@ redbook post --title "测试" --body "..." --images img.png --private
 | `--type <type>` | `all`, `video`, `image` | `all` |
 | `--page <n>` | Page number | `1` |
 
-### Analyze-Viral Options
+### Analyze-Viral / Viral-Template Options
 
 | Option | Description | Default |
 |--------|-------------|---------|
 | `--comment-pages <n>` | Number of comment pages to fetch | `3` |
+
+### Batch-Reply Options
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--strategy <name>` | `questions`, `top-engaged`, `all-unanswered` | `questions` |
+| `--template <text>` | Reply template with `{author}`, `{content}` placeholders | none (dry-run) |
+| `--max <n>` | Max replies to send (hard cap: 50) | `10` |
+| `--delay <ms>` | Delay between replies in ms (min: 2000) | `3000` |
+| `--dry-run` | Preview candidates without posting | auto when no template |
 
 ### Post Options
 
@@ -316,7 +407,29 @@ Publishing **frequently triggers captcha** (type=124). Image upload works, but t
 - **Main API** (`edith.xiaohongshu.com`) — for reading: search, feed, notes, comments, user profiles. Uses x-s signature with 144-byte payload (v4.3.1).
 - **Creator API** (`creator.xiaohongshu.com`) — for writing: upload images, publish notes. Uses simpler AES-128-CBC signing.
 
-## Claude Code Integration
+## Analysis Modules (A-K)
+
+11 composable analysis modules covering the full workflow from keyword research to engagement automation:
+
+| Module | Purpose |
+|--------|---------|
+| A. Keyword Matrix | Analyze engagement ceiling and competition density per keyword |
+| B. Cross-Topic Heatmap | Find topic × scene content gaps |
+| C. Engagement Signals | Classify content type (reference / insight / entertainment) |
+| D. Creator Profiling | Compare top creators' followers, engagement, style |
+| E. Content Form | Image-text vs. video performance comparison |
+| F. Opportunity Scoring | Rank keywords by effort-to-reward ratio |
+| G. Audience Inference | Infer user persona from engagement signals |
+| H. Content Brainstorm | Data-backed content ideas |
+| I. Comment Operations | Filter and batch-reply to comments by strategy |
+| J. Viral Replication | Extract content templates from viral notes |
+| K. Engagement Automation | Combined I + J workflow for operations |
+
+See [SKILL.md](SKILL.md) for full module documentation and composed workflows.
+
+## AI Agent Integration
+
+### Claude Code
 
 Installs automatically as a Claude Code skill. Use `/redbook` in Claude Code:
 
@@ -327,13 +440,24 @@ Installs automatically as a Claude Code skill. Use `/redbook` in Claude Code:
 /redbook analyze-viral <url>                    # Analyze a viral note
 ```
 
-The skill includes XHS-native analysis modules — keyword engagement matrix, cross-topic heatmaps, engagement signal classification, creator profiling, opportunity scoring, and more. You can give natural language instructions for complex tasks:
+You can give natural language instructions for complex tasks:
 
 - *"Analyze the competitive landscape for 'AI编程' on Xiaohongshu and find blue ocean keywords"*
 - *"Compare the content strategies of these three creators"*
 - *"Break down this viral note and tell me why it worked"*
+- *"Reply to the question comments on my latest post"*
 
 Claude will automatically combine multiple commands, parse JSON data, and produce structured analysis reports.
+
+### OpenClaw / ClawHub
+
+Officially supports [OpenClaw](https://openclaw.ai) and [ClawHub](https://docs.openclaw.ai/tools/clawhub). Install via ClawHub:
+
+```bash
+clawhub install redbook
+```
+
+All `redbook` commands are available in OpenClaw after installation. The SKILL.md is compatible with both Claude Code and OpenClaw ecosystems.
 
 ## Programmatic Usage
 

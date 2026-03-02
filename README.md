@@ -11,6 +11,8 @@
 > **"帮我安装 `@lucasygu/redbook` 这个小红书 CLI 工具，然后运行 `redbook whoami` 验证是否能正常连接。GitHub 地址：https://github.com/lucasygu/redbook"**
 >
 > AI 会自动完成安装、验证连接、处理可能的 Cookie 问题。你只需要确保已在 Chrome 中登录 xiaohongshu.com。
+>
+> 安装完成后，试试：**"帮我分析'AI编程'这个话题在小红书上的竞争格局"** —— AI 会自动搜索关键词、分析互动数据、发现头部博主、给出内容建议。
 
 ## 安装
 
@@ -21,6 +23,16 @@ npm install -g @lucasygu/redbook
 需要 Node.js >= 22。使用 Chrome 浏览器的 Cookie —— 请先在 Chrome 中登录 xiaohongshu.com。
 
 安装后运行 `redbook whoami` 验证连接。如果遇到 macOS 钥匙串弹窗，请点击"始终允许"。CLI 会自动检测所有 Chrome 配置文件，找到你的小红书登录状态。
+
+## 能做什么
+
+- **话题研究** —— 搜索关键词，分析哪些话题有流量、哪些是蓝海
+- **竞品分析** —— 找到头部博主，对比粉丝量、互动数据、内容风格
+- **爆款拆解** —— 分析爆款笔记的标题钩子、互动比例、评论主题
+- **内容策划** —— 基于数据发现内容机会，生成有数据支撑的选题建议
+- **受众洞察** —— 从互动信号推断目标用户画像
+
+通过 AI 助手使用时，这些工作流可以自动串联完成。直接使用 CLI 时，每个命令也可以独立运行。
 
 ## 快速开始
 
@@ -66,7 +78,7 @@ redbook post --title "测试" --body "..." --images img.png --private
 | `user <userId>` | 查看用户资料 |
 | `user-posts <userId>` | 列出用户所有笔记 |
 | `feed` | 获取推荐页内容 |
-| `post` | 发布图文笔记 |
+| `post` | 发布图文笔记（易触发验证码，详见下方说明） |
 | `topics <关键词>` | 搜索话题/标签 |
 | `analyze-viral <url>` | 分析爆款笔记（钩子、互动、结构） |
 
@@ -86,7 +98,15 @@ redbook post --title "测试" --body "..." --images img.png --private
 | `--type <类型>` | `all`（全部）、`video`（视频）、`image`（图文） | `all` |
 | `--page <页码>` | 页码 | `1` |
 
-### 发布选项
+### 分析选项（analyze-viral）
+
+| 选项 | 说明 | 默认值 |
+|------|------|--------|
+| `--comment-pages <n>` | 获取评论页数 | `3` |
+
+### 发布选项（post）
+
+发布功能目前**容易触发验证码**（type=124）。图片上传正常，但发布步骤经常被拦截。如需发布笔记，建议使用浏览器自动化。
 
 | 选项 | 说明 |
 |------|------|
@@ -118,13 +138,19 @@ redbook post --title "测试" --body "..." --images img.png --private
 安装后自动注册为 Claude Code 技能。在 Claude Code 中使用 `/redbook` 命令：
 
 ```
-/redbook search "AI编程"              # 搜索笔记
-/redbook read <url>                   # 阅读笔记
-/redbook user <userId>                # 查看博主
-/redbook analyze <userId>             # 完整博主分析
+/redbook search "AI编程"                        # 搜索笔记
+/redbook read <url>                             # 阅读笔记
+/redbook user <userId>                          # 查看博主
+/redbook analyze-viral <url>                    # 分析爆款笔记
 ```
 
-Claude 会自动调用 CLI 命令，解析结果，完成竞品分析、话题研究等复杂任务。
+技能内置了小红书平台专属的分析模块 —— 关键词矩阵、跨话题热力图、互动信号分类、博主画像、内容机会评分等。你可以直接用自然语言下达复杂任务：
+
+- *"分析'AI编程'在小红书的竞争格局，找出蓝海关键词"*
+- *"对比这三个博主的内容策略和互动数据"*
+- *"拆解这篇爆款笔记，告诉我为什么火了"*
+
+Claude 会自动组合多个命令，解析 JSON 数据，输出结构化分析报告。
 
 ## 编程接口
 
@@ -168,6 +194,8 @@ A fast CLI tool for [Xiaohongshu (小红书 / RED)](https://www.xiaohongshu.com)
 > **"Install the `@lucasygu/redbook` Xiaohongshu CLI tool and run `redbook whoami` to verify it works. Repo: https://github.com/lucasygu/redbook"**
 >
 > The agent will handle installation, verify the connection, and troubleshoot any cookie issues. Just make sure you're logged into xiaohongshu.com in Chrome first.
+>
+> Once installed, try: **"Analyze the competitive landscape for 'AI编程' on Xiaohongshu"** — the agent will search keywords, analyze engagement data, profile top creators, and suggest content opportunities.
 
 ## Install
 
@@ -178,6 +206,16 @@ npm install -g @lucasygu/redbook
 Requires Node.js >= 22. Uses cookies from your Chrome browser session — you must be logged into xiaohongshu.com in Chrome.
 
 After installing, run `redbook whoami` to verify the connection. If macOS shows a Keychain prompt, click "Always Allow". The CLI auto-detects all Chrome profiles to find your XHS session.
+
+## What You Can Do
+
+- **Topic research** — Search keywords, analyze which topics have demand vs. gaps
+- **Competitive analysis** — Find top creators, compare followers, engagement, content style
+- **Viral note breakdown** — Analyze title hooks, engagement ratios, comment themes
+- **Content planning** — Discover content opportunities with data-backed topic suggestions
+- **Audience insights** — Infer target audience from engagement signals
+
+When used through an AI agent, these workflows chain together automatically. Each CLI command also works standalone.
 
 ## Quick Start
 
@@ -223,7 +261,7 @@ redbook post --title "测试" --body "..." --images img.png --private
 | `user <userId>` | Get user profile info |
 | `user-posts <userId>` | List a user's posted notes |
 | `feed` | Get homepage feed |
-| `post` | Publish an image note |
+| `post` | Publish an image note (captcha-prone, see below) |
 | `topics <keyword>` | Search for topics/hashtags |
 | `analyze-viral <url>` | Analyze why a viral note works (hooks, engagement, structure) |
 
@@ -243,7 +281,15 @@ redbook post --title "测试" --body "..." --images img.png --private
 | `--type <type>` | `all`, `video`, `image` | `all` |
 | `--page <n>` | Page number | `1` |
 
+### Analyze-Viral Options
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--comment-pages <n>` | Number of comment pages to fetch | `3` |
+
 ### Post Options
+
+Publishing **frequently triggers captcha** (type=124). Image upload works, but the publish step is unreliable. For posting, consider using browser automation instead.
 
 | Option | Description |
 |--------|-------------|
@@ -275,13 +321,19 @@ redbook post --title "测试" --body "..." --images img.png --private
 Installs automatically as a Claude Code skill. Use `/redbook` in Claude Code:
 
 ```
-/redbook search "AI编程"              # Search notes
-/redbook read <url>                   # Read a note
-/redbook user <userId>                # Creator profile
-/redbook analyze <userId>             # Full creator analysis
+/redbook search "AI编程"                        # Search notes
+/redbook read <url>                             # Read a note
+/redbook user <userId>                          # Creator profile
+/redbook analyze-viral <url>                    # Analyze a viral note
 ```
 
-Claude will call CLI commands, parse results, and handle complex workflows like competitive analysis and topic research.
+The skill includes XHS-native analysis modules — keyword engagement matrix, cross-topic heatmaps, engagement signal classification, creator profiling, opportunity scoring, and more. You can give natural language instructions for complex tasks:
+
+- *"Analyze the competitive landscape for 'AI编程' on Xiaohongshu and find blue ocean keywords"*
+- *"Compare the content strategies of these three creators"*
+- *"Break down this viral note and tell me why it worked"*
+
+Claude will automatically combine multiple commands, parse JSON data, and produce structured analysis reports.
 
 ## Programmatic Usage
 

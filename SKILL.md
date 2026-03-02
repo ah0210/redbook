@@ -1,11 +1,32 @@
 ---
-description: Search, read, and analyze Xiaohongshu (小红书) content via CLI
+description: Search, read, analyze, and automate Xiaohongshu (小红书) content via CLI
 allowed-tools: Bash, Read, Write, Glob, Grep
+# OpenClaw / ClawHub metadata (clawhub install redbook)
+name: redbook
+version: 0.2.0
+metadata:
+  openclaw:
+    requires:
+      bins:
+        - redbook
+    install:
+      - kind: node
+        package: "@lucasygu/redbook"
+        bins: [redbook]
+    os: [macos]
+    homepage: https://github.com/lucasygu/redbook
+tags:
+  - xiaohongshu
+  - social-media
+  - analytics
+  - content-ops
 ---
 
 # Redbook — Xiaohongshu CLI
 
-Use the `redbook` CLI to search notes, read content, analyze creators, and research topics on Xiaohongshu (小红书/RED).
+Use the `redbook` CLI to search notes, read content, analyze creators, automate engagement, and research topics on Xiaohongshu (小红书/RED).
+
+**OpenClaw users:** Install via `clawhub install redbook` or `npm install -g @lucasygu/redbook`.
 
 ## Usage
 
@@ -28,6 +49,10 @@ Use the `redbook` CLI to search notes, read content, analyze creators, and resea
 | Browse feed | `redbook feed --json` |
 | Search hashtags | `redbook topics "keyword" --json` |
 | Analyze viral note | `redbook analyze-viral <url> --json` |
+| Extract content template | `redbook viral-template <url1> <url2> --json` |
+| Post a comment | `redbook comment <url> --content "text"` |
+| Reply to comment | `redbook reply <url> --comment-id <id> --content "text"` |
+| Batch reply (preview) | `redbook batch-reply <url> --strategy questions --dry-run` |
 | Check connection | `redbook whoami` |
 
 **Always add `--json`** when parsing output programmatically. Without it, output is human-formatted text.
@@ -303,6 +328,112 @@ redbook search "keyword" --type video --sort popular --json
 
 ---
 
+### Module I: Comment Operations
+
+**Answers:** Which comments deserve a reply? What is the comment quality distribution?
+
+**Commands:**
+```bash
+# 1. Fetch all comments
+redbook comments "<noteUrl>" --all --json
+
+# 2. Preview reply candidates (dry run)
+redbook batch-reply "<noteUrl>" --strategy questions --dry-run --json
+
+# 3. Execute replies with template
+redbook batch-reply "<noteUrl>" --strategy questions \
+  --template "感谢提问！关于{content}，..." \
+  --max 10 --delay 3000
+```
+
+**Fields to extract from `--dry-run` JSON:**
+- `candidates[].commentId` — target comments
+- `candidates[].isQuestion` — boolean, detected question
+- `candidates[].likes` — engagement signal
+- `candidates[].hasSubReplies` — whether already answered
+- `skipped` — how many comments were filtered out
+- `totalComments` — total fetched
+
+**Strategies:**
+- `questions` — replies to comments ending with `？` or `?` (learning-oriented audience)
+- `top-engaged` — replies to highest-liked comments (maximum visibility)
+- `all-unanswered` — replies to comments with no existing sub-replies (fill gaps)
+
+**How to interpret:**
+- High question rate (>15%) = audience is learning-oriented → reply to build authority
+- High top-engaged comments (>100 likes) = reply to visible comments for maximum reach
+- Many unanswered comments = engagement gap, opportunity to increase reply rate
+
+**Safety:** Hard cap 50 replies per batch, minimum 2s delay, `--dry-run` by default (no template = preview only), immediate stop on captcha.
+
+**Output:** Reply plan table with candidate comments, strategy match reason, and status.
+
+---
+
+### Module J: Viral Replication
+
+**Answers:** What structural template can I extract from successful notes to guide new content creation?
+
+**Commands:**
+```bash
+# 1. Find top notes for a keyword
+redbook search "keyword" --sort popular --json
+
+# 2. Extract structural template from 2-3 top performers
+redbook viral-template "<url1>" "<url2>" "<url3>" --json
+```
+
+**Fields to extract from `viral-template` JSON:**
+- `dominantHookPatterns[]` — hook types appearing in majority of notes
+- `titleStructure.commonPatterns[]` — specific title formula
+- `titleStructure.avgLength` — target title length
+- `bodyStructure.lengthRange` — target word count [min, max]
+- `bodyStructure.paragraphRange` — target paragraph count
+- `engagementProfile.type` — reference/insight/entertainment
+- `audienceSignals.commonThemes[]` — what the audience talks about
+
+**How to interpret:**
+- Consistent hook patterns across notes = proven formula for this niche
+- Narrow body length range = audience has clear content length preference
+- High collect/like in profile = audience saves content → create reference material
+- Common comment themes = topics to address in new content
+
+**Composition with other modules:**
+- Uses Module A results to identify top URLs for template extraction
+- Feeds into Module H (Content Brainstorm) as structural constraint
+- Uses Module C classification to validate engagement profile
+
+**Output:** Content template spec — the structural skeleton for content creation. An LLM (via the composed workflow) uses this template to generate actual title, body, hashtags, and cover image prompt.
+
+---
+
+### Module K: Engagement Automation
+
+**Answers:** How should I manage ongoing engagement with my audience?
+
+This module is a workflow that composes Modules I and J with human oversight.
+
+**Workflow:**
+1. **Monitor** — `redbook comments "<myNoteUrl>" --all --json` to fetch recent comments
+2. **Filter** — `redbook batch-reply --strategy questions --dry-run` to identify reply candidates
+3. **Review** — Human reviews dry-run output (or LLM reviews with persona guidelines)
+4. **Execute** — `redbook batch-reply --strategy questions --template "..." --max 10`
+5. **Report** — Summary of replies sent, errors encountered, rate limit status
+
+**Safety rules:**
+- Always `--dry-run` first, human approval before execution
+- Maximum 50 replies per session
+- Minimum 2-second delay between replies
+- Never reply to the same comment twice (check `hasSubReplies`)
+- Stop immediately on captcha — do not retry
+
+**Anti-spam guidelines:**
+- Vary reply templates across batches
+- Limit to 1-2 batch runs per note per day
+- Prioritize quality (targeted strategy) over quantity
+
+---
+
 ## Composed Workflows
 
 Combine modules for different analysis depths.
@@ -332,21 +463,50 @@ The comprehensive playbook — keyword landscape, cross-topic heatmap, engagemen
 
 No module composition needed — `analyze-viral` returns hook analysis, engagement ratios, comment themes, author baseline comparison, and a 0-100 viral score in one call.
 
-### Viral Pattern Research
+### Viral Pattern Research → Content Template
 ```bash
 # 1. Find top notes
 redbook search "keyword" --sort popular --json
 
-# 2. Analyze 3-5 top notes
-redbook analyze-viral "<url1>" --json
-redbook analyze-viral "<url2>" --json
-redbook analyze-viral "<url3>" --json
-
-# 3. Synthesize across notes:
-#    - Which hookPatterns[] appear most often?
-#    - What collectToLikeRatio is typical?
-#    - What content structure drives saves vs. shares?
+# 2. Extract template from top 3 notes (replaces manual synthesis)
+redbook viral-template "<url1>" "<url2>" "<url3>" --json
 ```
+
+`viral-template` automates what previously required manual synthesis across `analyze-viral` results. It outputs a `ContentTemplate` JSON that captures dominant hooks, body structure ranges, engagement profile, and audience signals.
+
+### Reply Management
+**Modules:** I
+
+Single-module workflow for managing comment engagement on your notes. Use `batch-reply --dry-run` to audit, then execute with a template.
+
+### Content Replication
+**Modules:** A → J → H
+
+Keyword research → viral template extraction → data-backed content brainstorm. The template provides structural constraints that guide Module H's content ideas.
+
+### Full Operations
+**Modules:** A → C → I → J → K
+
+Comprehensive automation playbook — keyword analysis, engagement classification, comment operations, viral replication templates, and engagement automation workflow.
+
+---
+
+## API vs Browser Limitations
+
+The following operations work reliably via API:
+- **Reading**: search, notes, comments, user profiles, feed
+- **Writing**: top-level comments, comment replies
+- **Analysis**: viral scoring, template extraction, batch reply planning
+
+The following operations are unreliable via API (frequently trigger captcha):
+- Publishing notes (use `--private` for higher success rate)
+- Bulk operations at very high frequency
+
+The following operations require browser automation (not supported by this CLI):
+- Captcha solving, real-time notifications
+- Like/collect/follow (heavy anti-automation enforcement)
+- DM/private messaging
+- Cover image generation (use external tools like Gemini/DALL-E)
 
 ---
 
@@ -442,6 +602,72 @@ Returns `{ note, score, hook, content, visual, engagement, comments, relative, f
 - `relative.viralMultiplier` — this note's likes / author's median likes
 - `relative.isOutlier` — true if viralMultiplier > 3
 - `comments.themes[]` — top recurring keyword phrases from comments
+
+### `redbook viral-template <url> [url2] [url3]`
+
+Extract a reusable content template from 1-3 viral notes. Analyzes each note (same pipeline as `analyze-viral`) and synthesizes common structural patterns.
+
+```bash
+redbook viral-template "<url1>" "<url2>" "<url3>" --json
+redbook viral-template "<url1>" --comment-pages 5 --json
+```
+
+**Options:**
+- `--comment-pages <n>`: Comment pages to fetch per note (default: 3, max: 10)
+
+**JSON output structure:**
+Returns `{ dominantHookPatterns, titleStructure, bodyStructure, engagementProfile, audienceSignals, sourceNotes, generatedAt }`.
+
+- `dominantHookPatterns[]` — hook types appearing in majority of input notes
+- `titleStructure.avgLength` — average title length across notes
+- `bodyStructure.lengthRange` — [min, max] body length
+- `engagementProfile.type` — "reference" / "insight" / "entertainment"
+- `audienceSignals.commonThemes[]` — merged comment themes across notes
+
+### `redbook comment <url>`
+
+Post a top-level comment on a note.
+
+```bash
+redbook comment "<noteUrl>" --content "Great post!" --json
+```
+
+**Options:**
+- `--content <text>` (required): Comment text
+
+### `redbook reply <url>`
+
+Reply to a specific comment on a note.
+
+```bash
+redbook reply "<noteUrl>" --comment-id "<commentId>" --content "Thanks for asking!" --json
+```
+
+**Options:**
+- `--comment-id <id>` (required): Comment ID to reply to (from `comments --json` output)
+- `--content <text>` (required): Reply text
+
+### `redbook batch-reply <url>`
+
+Reply to multiple comments using a filtering strategy. Always preview with `--dry-run` first.
+
+```bash
+# Preview which comments match the strategy
+redbook batch-reply "<noteUrl>" --strategy questions --dry-run --json
+
+# Execute replies with a template
+redbook batch-reply "<noteUrl>" --strategy questions \
+  --template "感谢提问！{content}" --max 10 --delay 3000
+```
+
+**Options:**
+- `--strategy <name>`: `questions` (default), `top-engaged`, `all-unanswered`
+- `--template <text>`: Reply template with `{author}`, `{content}` placeholders
+- `--max <n>`: Max replies (default: 10, hard cap: 50)
+- `--delay <ms>`: Delay between replies in ms (default: 3000, min: 2000)
+- `--dry-run`: Preview candidates without posting (default when no template)
+
+**Safety:** Stops immediately on captcha. No template = dry-run only.
 
 ### `redbook whoami`
 

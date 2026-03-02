@@ -111,6 +111,10 @@ export interface ViralAnalysis {
   fetchedAt: string;
 }
 
+// ─── Shared Patterns ────────────────────────────────────────────────────────
+
+export const QUESTION_PATTERN = /[？?]\s*$/;
+
 // ─── Chinese Pattern Dictionaries ───────────────────────────────────────────
 
 const EMOTION_WORDS = [
@@ -153,7 +157,7 @@ export function analyzeHook(title: string): HookAnalysis {
   const hasNumber = NUMBER_PATTERN.test(title);
   if (hasNumber) patterns.push("Number Hook");
 
-  const hasQuestion = /[？?]\s*$/.test(title);
+  const hasQuestion = QUESTION_PATTERN.test(title);
   if (hasQuestion) patterns.push("Question");
 
   const hasExclamation = /[！!]\s*$/.test(title);
@@ -285,7 +289,7 @@ export function analyzeComments(
   const totalLikes = comments.reduce((sum, c) => sum + num(c.like_count), 0);
 
   const questionCount = comments.filter((c) =>
-    /[？?]\s*$/.test(String(c.content ?? ""))
+    QUESTION_PATTERN.test(String(c.content ?? ""))
   ).length;
 
   // Bigram frequency for theme extraction

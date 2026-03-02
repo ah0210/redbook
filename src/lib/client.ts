@@ -295,6 +295,19 @@ export class XhsClient {
     });
   }
 
+  async replyComment(
+    noteId: string,
+    targetCommentId: string,
+    content: string
+  ): Promise<unknown> {
+    return this.mainApiPost("/api/sns/web/v1/comment/post", {
+      note_id: noteId,
+      content,
+      target_comment_id: targetCommentId,
+      at_users: [],
+    });
+  }
+
   // ─── HTML Fallback ────────────────────────────────────────────────────
 
   async getNoteFromHtml(

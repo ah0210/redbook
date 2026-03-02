@@ -23,6 +23,12 @@ import { dirname, join } from "node:path";
 import { extractCookies, type CookieSource } from "./lib/cookies.js";
 import { XhsClient, XhsApiError } from "./lib/client.js";
 import { analyzeViral, formatViralAnalysis } from "./lib/analyze.js";
+import {
+  selectCandidates,
+  executeReplies,
+  type StrategyName,
+} from "./lib/reply-strategy.js";
+import { extractTemplate, formatTemplate } from "./lib/template.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const pkg = JSON.parse(readFileSync(join(__dirname, "..", "package.json"), "utf-8"));
@@ -529,6 +535,261 @@ analyzeViralCmd.action(async (url, opts) => {
       output(analysis, true);
     } else {
       console.log(formatViralAnalysis(analysis));
+    }
+  } catch (err) {
+    handleError(err);
+  }
+});
+
+// ─── viral-template ──────────────────────────────────────────────────────────
+
+const viralTemplateCmd = program
+  .command("viral-template <urls...>")
+  .description("Extract a content template from 1-3 viral notes")
+  .option("--comment-pages <n>", "Comment pages to fetch per note (max 10)", "3");
+addCookieOption(viralTemplateCmd);
+addJsonOption(viralTemplateCmd);
+
+viralTemplateCmd.action(async (urls: string[], opts) => {
+  try {
+    if (urls.length > 3) {
+      console.error(kleur.red("Maximum 3 URLs allowed"));
+      process.exit(1);
+    }
+
+    const client = await getClient(opts.cookieSource, opts.chromeProfile);
+    const commentPages = Math.min(parseInt(opts.commentPages) || 3, 10);
+    const analyses = [];
+
+    for (const url of urls) {
+      const { noteId, xsecToken } = parseNoteUrl(url);
+      console.error(kleur.dim(`Analyzing ${noteId}...`));
+
+      // Fetch note
+      let note: Record<string, unknown>;
+      if (xsecToken) {
+        try {
+          const feedResult = (await client.getNoteById(noteId, xsecToken)) as {
+            items?: Array<{ note_card?: Record<string, unknown> }>;
+          };
+          note = feedResult?.items?.[0]?.note_card ?? {};
+          if (!note.user) {
+            note = (await client.getNoteFromHtml(noteId, xsecToken)) as Record<string, unknown>;
+          }
+        } catch {
+          note = (await client.getNoteFromHtml(noteId, xsecToken)) as Record<string, unknown>;
+        }
+      } else {
+        note = (await client.getNoteFromHtml(noteId, "")) as Record<string, unknown>;
+      }
+
+      const user = (note.user as Record<string, unknown>) ?? {};
+      const userId = String(user.user_id ?? "");
+      if (!userId) {
+        console.error(kleur.yellow(`Skipping ${noteId} — could not extract author`));
+        continue;
+      }
+
+      // Fetch comments, author posts, author info in parallel
+      const fetchComments = async () => {
+        const all: Record<string, unknown>[] = [];
+        let cursor = "";
+        for (let i = 0; i < commentPages; i++) {
+          try {
+            const res = (await client.getComments(noteId, cursor, xsecToken ?? "")) as {
+              comments?: Record<string, unknown>[];
+              has_more?: boolean;
+              cursor?: string;
+            };
+            if (res.comments) all.push(...res.comments);
+            if (!res.has_more) break;
+            cursor = res.cursor ?? "";
+          } catch { break; }
+        }
+        return all;
+      };
+
+      const fetchAuthorPosts = async () => {
+        try {
+          const res = (await client.getUserNotes(userId)) as { notes?: Record<string, unknown>[] };
+          return res.notes ?? [];
+        } catch { return []; }
+      };
+
+      const fetchAuthorInfo = async () => {
+        try {
+          const res = (await client.getUserInfo(userId)) as Record<string, unknown>;
+          const interactions = (res.interactions ?? []) as Array<{ type?: string; count?: string }>;
+          const fansEntry = interactions.find((i) => i.type === "fans");
+          if (fansEntry?.count) {
+            const s = fansEntry.count.trim();
+            if (s.endsWith("万")) return Math.round(parseFloat(s.slice(0, -1)) * 10000);
+            if (s.endsWith("亿")) return Math.round(parseFloat(s.slice(0, -1)) * 100000000);
+            return parseInt(s, 10) || 0;
+          }
+          return 0;
+        } catch { return 0; }
+      };
+
+      const [comments, authorPosts, authorFollowers] = await Promise.all([
+        fetchComments(), fetchAuthorPosts(), fetchAuthorInfo(),
+      ]);
+
+      analyses.push(analyzeViral(noteId, note, comments, authorPosts, authorFollowers));
+    }
+
+    if (analyses.length === 0) {
+      console.error(kleur.red("No notes could be analyzed"));
+      process.exit(1);
+    }
+
+    const template = extractTemplate(analyses);
+
+    if (opts.json) {
+      output(template, true);
+    } else {
+      console.log(formatTemplate(template));
+    }
+  } catch (err) {
+    handleError(err);
+  }
+});
+
+// ─── comment ─────────────────────────────────────────────────────────────────
+
+const commentCmd = program
+  .command("comment <url>")
+  .description("Post a top-level comment on a note")
+  .requiredOption("--content <text>", "Comment text");
+addCookieOption(commentCmd);
+addJsonOption(commentCmd);
+
+commentCmd.action(async (url, opts) => {
+  try {
+    const client = await getClient(opts.cookieSource, opts.chromeProfile);
+    const { noteId } = parseNoteUrl(url);
+    const result = await client.postComment(noteId, opts.content);
+    if (opts.json) {
+      output(result, true);
+    } else {
+      console.log(kleur.green("Comment posted!"));
+    }
+  } catch (err) {
+    handleError(err);
+  }
+});
+
+// ─── reply ───────────────────────────────────────────────────────────────────
+
+const replyCmd = program
+  .command("reply <url>")
+  .description("Reply to a comment on a note")
+  .requiredOption("--comment-id <id>", "Comment ID to reply to")
+  .requiredOption("--content <text>", "Reply text");
+addCookieOption(replyCmd);
+addJsonOption(replyCmd);
+
+replyCmd.action(async (url, opts) => {
+  try {
+    const client = await getClient(opts.cookieSource, opts.chromeProfile);
+    const { noteId } = parseNoteUrl(url);
+    const result = await client.replyComment(noteId, opts.commentId, opts.content);
+    if (opts.json) {
+      output(result, true);
+    } else {
+      console.log(kleur.green("Reply posted!"));
+    }
+  } catch (err) {
+    handleError(err);
+  }
+});
+
+// ─── batch-reply ─────────────────────────────────────────────────────────────
+
+const batchReplyCmd = program
+  .command("batch-reply <url>")
+  .description("Reply to multiple comments using a strategy")
+  .option("--strategy <name>", "Filter strategy: questions, top-engaged, all-unanswered", "questions")
+  .option("--template <text>", "Reply template with {author}, {content} placeholders")
+  .option("--max <n>", "Max replies to send (hard cap: 50)", "10")
+  .option("--delay <ms>", "Delay between replies in ms (min: 2000)", "3000")
+  .option("--dry-run", "Preview candidates without posting");
+addCookieOption(batchReplyCmd);
+addJsonOption(batchReplyCmd);
+
+batchReplyCmd.action(async (url, opts) => {
+  try {
+    const client = await getClient(opts.cookieSource, opts.chromeProfile);
+    const { noteId, xsecToken } = parseNoteUrl(url);
+    const strategy = opts.strategy as StrategyName;
+    const max = Math.min(parseInt(opts.max) || 10, 50);
+    const isDryRun = opts.dryRun || !opts.template;
+
+    // Fetch all comments
+    console.error(kleur.dim("Fetching comments..."));
+    const allComments: Record<string, unknown>[] = [];
+    let cursor = "";
+    let hasMore = true;
+    while (hasMore) {
+      const res = (await client.getComments(noteId, cursor, xsecToken ?? "")) as {
+        comments?: Record<string, unknown>[];
+        has_more?: boolean;
+        cursor?: string;
+      };
+      if (res.comments) allComments.push(...res.comments);
+      hasMore = res.has_more ?? false;
+      cursor = res.cursor ?? "";
+    }
+
+    // Select candidates
+    const plan = selectCandidates(allComments, strategy, max);
+    plan.noteId = noteId;
+
+    if (isDryRun || opts.json) {
+      if (opts.json) {
+        output(plan, true);
+      } else {
+        console.log(kleur.bold(`\nBatch Reply Plan — ${strategy}`));
+        console.log(kleur.dim(`${plan.totalComments} comments → ${plan.candidates.length} candidates (${plan.skipped} skipped)\n`));
+        for (const c of plan.candidates) {
+          console.log(
+            `  ${kleur.cyan(c.commentId.slice(0, 8))}  ${kleur.bold(`@${c.author}`)}  ${kleur.dim(`♥ ${c.likes}`)}`
+          );
+          console.log(`    ${c.content.slice(0, 80)}${c.content.length > 80 ? "..." : ""}`);
+        }
+        if (!opts.template) {
+          console.log(kleur.yellow("\nDry run (no --template provided). Add --template to execute."));
+        } else {
+          console.log(kleur.yellow("\nDry run mode. Remove --dry-run to execute."));
+        }
+      }
+      return;
+    }
+
+    // Execute replies
+    console.error(kleur.dim(`Sending ${plan.candidates.length} replies (delay: ${opts.delay}ms)...`));
+    const results = await executeReplies(
+      client,
+      noteId,
+      plan.candidates,
+      opts.template,
+      parseInt(opts.delay) || 3000,
+      {}
+    );
+
+    const succeeded = results.filter((r) => r.success).length;
+    const failed = results.filter((r) => !r.success).length;
+
+    if (opts.json) {
+      output(results, true);
+    } else {
+      console.log(kleur.green(`\n${succeeded} replies sent`));
+      if (failed > 0) {
+        console.log(kleur.red(`${failed} failed`));
+        for (const r of results.filter((r) => !r.success)) {
+          console.log(kleur.dim(`  @${r.author}: ${r.error}`));
+        }
+      }
     }
   } catch (err) {
     handleError(err);

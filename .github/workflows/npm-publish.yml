@@ -102,30 +102,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  check-skill:
-    runs-on: ubuntu-latest
-    outputs:
-      changed: ${{ steps.skill-check.outputs.changed }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 2
-
-      - name: Check if SKILL.md changed
-        id: skill-check
-        run: |
-          if git diff --name-only HEAD~1 HEAD | grep -q "^SKILL.md$"; then
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-            echo "SKILL.md changed"
-          else
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-            echo "SKILL.md unchanged"
-          fi
-
   clawhub-publish:
-    needs: [build, check-skill, check-version]
-    if: needs.check-skill.outputs.changed == 'true'
+    needs: [build, check-version]
+    if: needs.check-version.outputs.changed == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

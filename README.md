@@ -10,6 +10,8 @@
 >
 > **"帮我安装 `@lucasygu/redbook` 这个小红书 CLI 工具，然后运行 `redbook whoami` 验证是否能正常连接。GitHub 地址：https://github.com/lucasygu/redbook"**
 >
+> 或通过 OpenClaw 生态安装：**`clawhub install redbook`**
+>
 > AI 会自动完成安装、验证连接、处理可能的 Cookie 问题。你只需要确保已在 Chrome 中登录 xiaohongshu.com。
 >
 > 安装完成后，试试：**"帮我分析'AI编程'这个话题在小红书上的竞争格局"** —— AI 会自动搜索关键词、分析互动数据、发现头部博主、给出内容建议。
@@ -18,6 +20,8 @@
 
 ```bash
 npm install -g @lucasygu/redbook
+# 或通过 ClawHub（OpenClaw 生态）
+clawhub install redbook
 ```
 
 需要 Node.js >= 22。使用 Chrome 浏览器的 Cookie —— 请先在 Chrome 中登录 xiaohongshu.com。
@@ -282,6 +286,8 @@ A fast CLI tool for [Xiaohongshu (小红书 / RED)](https://www.xiaohongshu.com)
 >
 > **"Install the `@lucasygu/redbook` Xiaohongshu CLI tool and run `redbook whoami` to verify it works. Repo: https://github.com/lucasygu/redbook"**
 >
+> Or install via OpenClaw ecosystem: **`clawhub install redbook`**
+>
 > The agent will handle installation, verify the connection, and troubleshoot any cookie issues. Just make sure you're logged into xiaohongshu.com in Chrome first.
 >
 > Once installed, try: **"Analyze the competitive landscape for 'AI编程' on Xiaohongshu"** — the agent will search keywords, analyze engagement data, profile top creators, and suggest content opportunities.
@@ -290,6 +296,8 @@ A fast CLI tool for [Xiaohongshu (小红书 / RED)](https://www.xiaohongshu.com)
 
 ```bash
 npm install -g @lucasygu/redbook
+# Or via ClawHub (OpenClaw ecosystem)
+clawhub install redbook
 ```
 
 Requires Node.js >= 22. Uses cookies from your Chrome browser session — you must be logged into xiaohongshu.com in Chrome.

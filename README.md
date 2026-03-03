@@ -6,11 +6,11 @@
 
 > ### 最快上手方式
 >
-> 把这段话发给你的 AI 助手（Claude Code、Cursor、Codex、Windsurf 等）：
+> 把这段话发给你的 AI 助手（Claude Code、Cursor、Codex、Windsurf、OpenClaw 等）：
 >
-> **"帮我安装 `@lucasygu/redbook` 这个小红书 CLI 工具，然后运行 `redbook whoami` 验证是否能正常连接。GitHub 地址：https://github.com/lucasygu/redbook"**
+> **"帮我用 npm 安装 `@lucasygu/redbook` 这个小红书 CLI 工具，然后运行 `redbook whoami` 验证是否能正常连接。GitHub 地址：https://github.com/lucasygu/redbook"**
 >
-> 或通过 OpenClaw 生态安装：**`clawhub install redbook`**
+> OpenClaw 用户也可以直接：**`clawhub install redbook`**
 >
 > AI 会自动完成安装、验证连接、处理可能的 Cookie 问题。你只需要确保已在 Chrome 中登录 xiaohongshu.com。
 >
@@ -282,11 +282,11 @@ A fast CLI tool for [Xiaohongshu (小红书 / RED)](https://www.xiaohongshu.com)
 
 > ### Easiest way to get started
 >
-> Paste this to your AI coding agent (Claude Code, Cursor, Codex, Windsurf, etc.):
+> Paste this to your AI coding agent (Claude Code, Cursor, Codex, Windsurf, OpenClaw, etc.):
 >
-> **"Install the `@lucasygu/redbook` Xiaohongshu CLI tool and run `redbook whoami` to verify it works. Repo: https://github.com/lucasygu/redbook"**
+> **"Install the `@lucasygu/redbook` Xiaohongshu CLI tool via npm and run `redbook whoami` to verify it works. Repo: https://github.com/lucasygu/redbook"**
 >
-> Or install via OpenClaw ecosystem: **`clawhub install redbook`**
+> OpenClaw users can also run: **`clawhub install redbook`**
 >
 > The agent will handle installation, verify the connection, and troubleshoot any cookie issues. Just make sure you're logged into xiaohongshu.com in Chrome first.
 >

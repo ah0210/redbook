@@ -92,10 +92,52 @@ function patchSweetCookieTimeout() {
   }
 }
 
+/**
+ * Patch node:sqlite BigInt overflow on Node < 24.4.
+ *
+ * Chrome stores expires_utc as microseconds since 1601 — values like
+ * 13448382439000000 exceed Number.MAX_SAFE_INTEGER. Node < 24.4 lacks
+ * the `readBigInts` option, so node:sqlite throws instead of returning
+ * a BigInt. Casting to TEXT in the SQL avoids the overflow; the existing
+ * JS code already handles string values via tryParseInt/normalizeExpiration.
+ */
+function patchSweetCookieBigInt() {
+  const target = join(
+    PACKAGE_ROOT,
+    'node_modules',
+    '@steipete',
+    'sweet-cookie',
+    'dist',
+    'providers',
+    'chromeSqlite',
+    'shared.js'
+  );
+
+  if (!existsSync(target)) return;
+
+  try {
+    const content = readFileSync(target, 'utf-8');
+    const needle = 'SELECT name, value, host_key, path, expires_utc, samesite, encrypted_value,';
+    if (!content.includes(needle)) {
+      // Already patched or upstream fixed
+      return;
+    }
+    const patched = content.replace(
+      needle,
+      'SELECT name, value, host_key, path, CAST(expires_utc AS TEXT) AS expires_utc, samesite, encrypted_value,'
+    );
+    writeFileSync(target, patched, 'utf-8');
+    console.log('[redbook] Patched sweet-cookie BigInt overflow (CAST expires_utc).');
+  } catch (err) {
+    console.log(`[redbook] Warning: could not patch sweet-cookie BigInt: ${err.message}`);
+  }
+}
+
 function main() {
   console.log('[redbook] Running post-install...');
   const success = setupClaudeSkill();
   patchSweetCookieTimeout();
+  patchSweetCookieBigInt();
   console.log('');
   console.log('[redbook] Installation complete!');
   if (success) {

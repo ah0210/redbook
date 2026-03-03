@@ -26,6 +26,9 @@ import { analyzeViral, formatViralAnalysis } from "./lib/analyze.js";
 import {
   selectCandidates,
   executeReplies,
+  DEFAULT_DELAY_MS,
+  MIN_DELAY_MS as MIN_REPLY_DELAY,
+  MAX_REPLIES_HARD_CAP,
   type StrategyName,
 } from "./lib/reply-strategy.js";
 import { extractTemplate, formatTemplate } from "./lib/template.js";
@@ -393,6 +396,7 @@ postCmd.action(async (opts) => {
       if (r.note_id) {
         console.log(`  URL: https://www.xiaohongshu.com/explore/${r.note_id}`);
       }
+      console.error(kleur.yellow("⚠ Rate limit: wait ≥3-4 hours before the next post (2-3 notes/day max)."));
     }
   } catch (err) {
     handleError(err);
@@ -673,6 +677,7 @@ commentCmd.action(async (url, opts) => {
       output(result, true);
     } else {
       console.log(kleur.green("Comment posted!"));
+      console.error(kleur.yellow("⚠ Rate limit: wait ≥3 minutes before the next comment to avoid risk control."));
     }
   } catch (err) {
     handleError(err);
@@ -698,6 +703,7 @@ replyCmd.action(async (url, opts) => {
       output(result, true);
     } else {
       console.log(kleur.green("Reply posted!"));
+      console.error(kleur.yellow("⚠ Rate limit: wait ≥3 minutes before the next reply to avoid risk control."));
     }
   } catch (err) {
     handleError(err);
@@ -711,8 +717,8 @@ const batchReplyCmd = program
   .description("Reply to multiple comments using a strategy")
   .option("--strategy <name>", "Filter strategy: questions, top-engaged, all-unanswered", "questions")
   .option("--template <text>", "Reply template with {author}, {content} placeholders")
-  .option("--max <n>", "Max replies to send (hard cap: 50)", "10")
-  .option("--delay <ms>", "Delay between replies in ms (min: 2000)", "3000")
+  .option("--max <n>", `Max replies to send (hard cap: ${MAX_REPLIES_HARD_CAP})`, "10")
+  .option("--delay <ms>", `Delay between replies in ms (min: ${MIN_REPLY_DELAY / 1000}s)`, String(DEFAULT_DELAY_MS))
   .option("--dry-run", "Preview candidates without posting");
 addCookieOption(batchReplyCmd);
 addJsonOption(batchReplyCmd);
@@ -722,7 +728,7 @@ batchReplyCmd.action(async (url, opts) => {
     const client = await getClient(opts.cookieSource, opts.chromeProfile);
     const { noteId, xsecToken } = parseNoteUrl(url);
     const strategy = opts.strategy as StrategyName;
-    const max = Math.min(parseInt(opts.max) || 10, 50);
+    const max = Math.min(parseInt(opts.max) || 10, MAX_REPLIES_HARD_CAP);
     const isDryRun = opts.dryRun || !opts.template;
 
     // Fetch all comments
@@ -767,13 +773,15 @@ batchReplyCmd.action(async (url, opts) => {
     }
 
     // Execute replies
-    console.error(kleur.dim(`Sending ${plan.candidates.length} replies (delay: ${opts.delay}ms)...`));
+    const delayMs = parseInt(opts.delay) || DEFAULT_DELAY_MS;
+    console.error(kleur.dim(`Sending ${plan.candidates.length} replies (delay: ~${Math.round(delayMs / 60000)}min ±30% jitter)...`));
+    console.error(kleur.yellow("⚠ Rate limit: XHS enforces anti-spam — replies spaced ≥3min apart with jitter."));
     const results = await executeReplies(
       client,
       noteId,
       plan.candidates,
       opts.template,
-      parseInt(opts.delay) || 3000,
+      delayMs,
       {}
     );
 
@@ -789,6 +797,45 @@ batchReplyCmd.action(async (url, opts) => {
         for (const r of results.filter((r) => !r.success)) {
           console.log(kleur.dim(`  @${r.author}: ${r.error}`));
         }
+      }
+    }
+  } catch (err) {
+    handleError(err);
+  }
+});
+
+// ─── render ──────────────────────────────────────────────────────────────────
+
+const renderCmd = program
+  .command("render <file>")
+  .description("Render markdown to styled PNG cards for Xiaohongshu posts")
+  .option("--style <name>", "Color style: purple, xiaohongshu, mint, sunset, ocean, elegant, dark", "xiaohongshu")
+  .option("--pagination <mode>", "Pagination: auto, separator", "auto")
+  .option("--output-dir <dir>", "Output directory (default: same as input file)")
+  .option("--width <n>", "Card width in px", "1080")
+  .option("--height <n>", "Card height in px", "1440")
+  .option("--dpr <n>", "Device pixel ratio", "2");
+addJsonOption(renderCmd);
+
+renderCmd.action(async (file, opts) => {
+  try {
+    const { renderCards } = await import("./lib/render.js");
+    const result = await renderCards(file, {
+      style: opts.style,
+      pagination: opts.pagination,
+      outputDir: opts.outputDir,
+      width: parseInt(opts.width),
+      height: parseInt(opts.height),
+      dpr: parseInt(opts.dpr),
+    });
+
+    if (opts.json) {
+      output(result, true);
+    } else {
+      console.log(kleur.green(`\nRendered ${result.totalCards + 1} images:`));
+      console.log(`  Cover: ${kleur.bold(result.coverPath)}`);
+      for (const p of result.cardPaths) {
+        console.log(`  Card:  ${kleur.bold(p)}`);
       }
     }
   } catch (err) {

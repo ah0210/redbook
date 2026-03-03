@@ -38,9 +38,13 @@ export interface ReplyResult {
 export type StrategyName = "questions" | "top-engaged" | "all-unanswered";
 
 // ─── Constants ──────────────────────────────────────────────────────────────
+// Based on XHS risk control research: 3+ minute intervals between replies,
+// uniform timing patterns trigger bot detection.
 
-const MAX_REPLIES_HARD_CAP = 50;
-const MIN_DELAY_MS = 2000;
+const MAX_REPLIES_HARD_CAP = 30;
+const MIN_DELAY_MS = 180_000; // 3 minutes — XHS minimum safe interval
+const DEFAULT_DELAY_MS = 300_000; // 5 minutes — recommended safe interval
+const JITTER_FACTOR = 0.3; // ±30% random variation to avoid uniform patterns
 
 // ─── Strategy Selection ─────────────────────────────────────────────────────
 
@@ -147,9 +151,10 @@ export async function executeReplies(
       });
     }
 
-    // Rate limit between replies (skip after last)
+    // Rate limit between replies with jitter (skip after last)
     if (candidate !== candidates[candidates.length - 1]) {
-      await sleep(delay);
+      const jittered = addJitter(delay, JITTER_FACTOR);
+      await sleep(jittered);
     }
   }
 
@@ -169,3 +174,10 @@ function toNum(v: unknown): number {
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
+
+function addJitter(ms: number, factor: number): number {
+  const offset = ms * factor * (2 * Math.random() - 1); // ±factor
+  return Math.max(MIN_DELAY_MS, Math.round(ms + offset));
+}
+
+export { DEFAULT_DELAY_MS, MIN_DELAY_MS, MAX_REPLIES_HARD_CAP };

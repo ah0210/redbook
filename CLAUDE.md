@@ -4,6 +4,12 @@
 
 **NEVER publish npm packages directly from local.** Always use the `npm-publish-cli` agent to bump version and publish via CI. The GitHub Actions workflow (`Publish to npm`) handles publishing on push to main. Publishing locally races CI and causes workflow failures.
 
+**Dual publishing (automated):**
+- **npm** — publishes when `package.json` version changes on push to main
+- **ClawHub** — publishes when `SKILL.md` changes on push to main (uses `CLAWHUB_TOKEN` secret)
+
+Both are conditional jobs in `.github/workflows/npm-publish.yml`. Manual trigger via `workflow_dispatch` is also available.
+
 ## Build & Test
 
 - `npm run build` — TypeScript compile + chmod
@@ -11,11 +17,24 @@
 
 ## Project Structure
 
-- `src/cli.ts` — CLI entry point, all 10 commands, `getClient()` is the single cookie→client funnel
+- `src/cli.ts` — CLI entry point, 15 commands, `getClient()` is the single cookie→client funnel
+- `src/lib/client.ts` — XHS API client (`postComment`, `replyComment`, etc.)
 - `src/lib/cookies.ts` — Cookie extraction with Chrome profile auto-discovery
-- `src/lib/client.ts` — XHS API client
 - `src/lib/signing.ts` — Request signing
-- `SKILL.md` — Claude Code skill documentation
+- `src/lib/analyze.ts` — Viral note analysis and question detection
+- `src/lib/reply-strategy.ts` — Batch reply filtering, templating, rate-limited execution
+- `src/lib/template.ts` — Viral content template extraction
+- `src/lib/render.ts` — Card rendering (markdown → PNG via puppeteer-core, optional dep)
+- `SKILL.md` — Skill documentation (serves both Claude Code and OpenClaw/ClawHub)
+- `.github/workflows/npm-publish.yml` — CI: build, npm publish, ClawHub publish
+
+## Render Command (Optional)
+
+- `redbook render <file>` — markdown → styled PNG cards using user's existing Chrome
+- Requires `puppeteer-core` and `marked` (optional peer deps, lazy imported)
+- Uses Chrome at `/Applications/Google Chrome.app/...` or `CHROME_PATH` env var
+- No cookies/XHS API needed — purely offline
+- HTML/CSS templates embedded as TypeScript template literals (no external files)
 
 ## Cookie Architecture
 

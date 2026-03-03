@@ -53,6 +53,7 @@ Use the `redbook` CLI to search notes, read content, analyze creators, automate 
 | Post a comment | `redbook comment <url> --content "text"` |
 | Reply to comment | `redbook reply <url> --comment-id <id> --content "text"` |
 | Batch reply (preview) | `redbook batch-reply <url> --strategy questions --dry-run` |
+| Render markdown to cards | `redbook render content.md --style xiaohongshu` |
 | Check connection | `redbook whoami` |
 
 **Always add `--json`** when parsing output programmatically. Without it, output is human-formatted text.
@@ -340,10 +341,10 @@ redbook comments "<noteUrl>" --all --json
 # 2. Preview reply candidates (dry run)
 redbook batch-reply "<noteUrl>" --strategy questions --dry-run --json
 
-# 3. Execute replies with template
+# 3. Execute replies with template (5 min delay with ±30% jitter)
 redbook batch-reply "<noteUrl>" --strategy questions \
   --template "感谢提问！关于{content}，..." \
-  --max 10 --delay 3000
+  --max 10
 ```
 
 **Fields to extract from `--dry-run` JSON:**
@@ -364,7 +365,7 @@ redbook batch-reply "<noteUrl>" --strategy questions \
 - High top-engaged comments (>100 likes) = reply to visible comments for maximum reach
 - Many unanswered comments = engagement gap, opportunity to increase reply rate
 
-**Safety:** Hard cap 50 replies per batch, minimum 2s delay, `--dry-run` by default (no template = preview only), immediate stop on captcha.
+**Safety:** Hard cap 30 replies per batch, minimum 3-minute delay with ±30% jitter (default 5 min), `--dry-run` by default (no template = preview only), immediate stop on captcha. See [Rate Limits & Safety](#rate-limits--safety) for details.
 
 **Output:** Reply plan table with candidate comments, strategy match reason, and status.
 
@@ -422,15 +423,75 @@ This module is a workflow that composes Modules I and J with human oversight.
 
 **Safety rules:**
 - Always `--dry-run` first, human approval before execution
-- Maximum 50 replies per session
-- Minimum 2-second delay between replies
+- Maximum 30 replies per session (hard cap)
+- Minimum 3-minute delay between replies, default 5 minutes, with ±30% random jitter
 - Never reply to the same comment twice (check `hasSubReplies`)
 - Stop immediately on captcha — do not retry
+- See [Rate Limits & Safety](#rate-limits--safety) for XHS risk control thresholds
 
 **Anti-spam guidelines:**
 - Vary reply templates across batches
 - Limit to 1-2 batch runs per note per day
 - Prioritize quality (targeted strategy) over quantity
+- Uniform timing patterns trigger bot detection — jitter is applied automatically
+
+---
+
+### Module L: Card Rendering
+
+**Answers:** How do I turn markdown content into Xiaohongshu-ready image cards?
+
+**Commands:**
+```bash
+# Render markdown to styled PNG cards
+redbook render content.md --style xiaohongshu
+
+# Custom style and output directory
+redbook render content.md --style dark --output-dir ./cards
+
+# JSON output (for programmatic use)
+redbook render content.md --json
+```
+
+**Input:** Markdown file with YAML frontmatter:
+```markdown
+---
+emoji: "🚀"
+title: "5个AI效率技巧"
+subtitle: "Claude Code 实战"
+---
+
+## 技巧一：...
+Content here...
+
+---
+
+## 技巧二：...
+More content...
+```
+
+**Output:** `cover.png` + `card_1.png`, `card_2.png`, ... in the same directory.
+
+**Card specs:**
+- **Size:** 1080×1440 (3:4 ratio, standard XHS image)
+- **DPR:** 2 (retina quality, actual output 2160×2880)
+- **Styles:** purple, xiaohongshu, mint, sunset, ocean, elegant, dark
+
+**Pagination modes:**
+- `auto` (default) — smart split on heading/paragraph boundaries using character-count heuristic
+- `separator` — manual split on `---` in markdown
+
+**How to interpret:**
+- Uses the user's existing Chrome for rendering (via `puppeteer-core`) — no browser download needed
+- Purely offline — no XHS API or cookies required
+- Output images are ready for `redbook post --images cover.png card_1.png ...`
+
+**Dependencies:** Requires `puppeteer-core` and `marked` (optional, install with `npm install -g puppeteer-core marked`).
+
+**Composition with other modules:**
+- Pairs with Module H (Content Brainstorm) — generate content ideas, write markdown, render to cards
+- Pairs with Module J (Viral Replication) — extract template, write content matching the template, render
+- Output feeds into `redbook post --images` for publishing
 
 ---
 
@@ -480,14 +541,57 @@ redbook viral-template "<url1>" "<url2>" "<url3>" --json
 Single-module workflow for managing comment engagement on your notes. Use `batch-reply --dry-run` to audit, then execute with a template.
 
 ### Content Replication
-**Modules:** A → J → H
+**Modules:** A → J → H → L
 
-Keyword research → viral template extraction → data-backed content brainstorm. The template provides structural constraints that guide Module H's content ideas.
+Keyword research → viral template extraction → data-backed content brainstorm → render to image cards. The template provides structural constraints that guide Module H's content ideas. Module L renders the final markdown to XHS-ready PNGs.
+
+### Content Creation End-to-End
+**Modules:** A → J → H → L → `post`
+
+The full pipeline: research keywords → extract viral template → brainstorm content → write markdown → render to styled image cards → publish via `redbook post --images cover.png card_1.png ...`
 
 ### Full Operations
 **Modules:** A → C → I → J → K
 
 Comprehensive automation playbook — keyword analysis, engagement classification, comment operations, viral replication templates, and engagement automation workflow.
+
+---
+
+## Rate Limits & Safety
+
+XHS enforces aggressive anti-spam (风控) that detects automated behavior through device fingerprinting, activity ratio monitoring, and timing pattern analysis. The CLI applies safe defaults based on platform research.
+
+### Safe Thresholds
+
+| Action | Safe Interval | CLI Default | Hard Cap |
+|--------|--------------|-------------|----------|
+| Post a note | 3-4 hours (2-3 notes/day max) | N/A (manual) | — |
+| Comment | ≥3 minutes | N/A (manual) | — |
+| Reply | ≥3 minutes | N/A (manual) | — |
+| Batch reply delay | ≥3 minutes | 5 min ±30% jitter | — |
+| Batch reply count | — | 10 | 30 |
+
+### Anti-Detection Measures
+
+- **Timing jitter:** ±30% random variation on all batch delays. Uniform intervals are a bot signature.
+- **Hard caps:** Maximum 30 replies per batch (down from 50). No override.
+- **Rate limit warnings:** `post`, `comment`, and `reply` commands display safe interval reminders after each action.
+- **Captcha circuit breaker:** Batch operations stop immediately on captcha (NeedVerify).
+
+### What Triggers Risk Control
+
+- **Uniform timing** — replying at exact 3-second intervals flags bot detection
+- **High frequency** — >50 interactions/minute across any action type
+- **Activity ratio anomaly** — more comments than post views signals inauthentic behavior
+- **Device fingerprint mismatch** — XHS fingerprints 21 hardware parameters
+
+### Best Practices for Agents
+
+1. Always `--dry-run` first, review candidates, then execute
+2. Use the default 5-minute delay — do not override `--delay` below 180000 (3 min)
+3. Limit batch runs to 1-2 per note per day
+4. Vary reply templates between batches
+5. Space `post` commands 3-4 hours apart (2-3 notes/day maximum)
 
 ---
 
@@ -655,19 +759,41 @@ Reply to multiple comments using a filtering strategy. Always preview with `--dr
 # Preview which comments match the strategy
 redbook batch-reply "<noteUrl>" --strategy questions --dry-run --json
 
-# Execute replies with a template
+# Execute replies with a template (default 5 min delay with jitter)
 redbook batch-reply "<noteUrl>" --strategy questions \
-  --template "感谢提问！{content}" --max 10 --delay 3000
+  --template "感谢提问！{content}" --max 10
 ```
 
 **Options:**
 - `--strategy <name>`: `questions` (default), `top-engaged`, `all-unanswered`
 - `--template <text>`: Reply template with `{author}`, `{content}` placeholders
-- `--max <n>`: Max replies (default: 10, hard cap: 50)
-- `--delay <ms>`: Delay between replies in ms (default: 3000, min: 2000)
+- `--max <n>`: Max replies (default: 10, hard cap: 30)
+- `--delay <ms>`: Delay between replies in ms (default: 300000 / 5 min, min: 180000 / 3 min). ±30% random jitter applied automatically.
 - `--dry-run`: Preview candidates without posting (default when no template)
 
-**Safety:** Stops immediately on captcha. No template = dry-run only.
+**Safety:** Stops immediately on captcha. No template = dry-run only. Delays include random jitter to avoid uniform timing patterns that trigger XHS bot detection.
+
+### `redbook render <file>`
+
+Render a markdown file with YAML frontmatter into styled PNG image cards. Uses the user's existing Chrome installation — no browser download needed.
+
+```bash
+redbook render content.md --style xiaohongshu
+redbook render content.md --style dark --output-dir ./cards
+redbook render content.md --pagination separator --json
+```
+
+**Options:**
+- `--style <name>`: `purple`, `xiaohongshu` (default), `mint`, `sunset`, `ocean`, `elegant`, `dark`
+- `--pagination <mode>`: `auto` (default), `separator` (split on `---`)
+- `--output-dir <dir>`: Output directory (default: same as input file)
+- `--width <n>`: Card width in px (default: 1080)
+- `--height <n>`: Card height in px (default: 1440)
+- `--dpr <n>`: Device pixel ratio (default: 2)
+
+**Requires:** `puppeteer-core` and `marked` (`npm install -g puppeteer-core marked`). Does NOT require XHS cookies — purely offline rendering.
+
+**Override Chrome path:** Set `CHROME_PATH` environment variable if Chrome is not in the standard location.
 
 ### `redbook whoami`
 
@@ -808,3 +934,4 @@ const topics = await client.searchTopics("Claude Code");
 - Node.js >= 22
 - Logged into xiaohongshu.com in Chrome (or Safari/Firefox with `--cookie-source`)
 - macOS (cookie extraction uses native keychain access)
+- **For card rendering only:** `puppeteer-core` and `marked` (`npm install -g puppeteer-core marked`). Uses your existing Chrome — no additional browser download.

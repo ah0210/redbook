@@ -31,6 +31,7 @@ npm install -g @lucasygu/redbook
 - **爆款拆解** —— 分析爆款笔记的标题钩子、互动比例、评论主题
 - **爆款模板** —— 从多篇爆款笔记提取内容模板（标题结构、正文结构、钩子模式）
 - **评论管理** —— 发评论、回复评论、按策略批量回复（问题优先 / 高赞优先 / 未回复优先）
+- **图文卡片** —— Markdown 渲染为小红书风格的 PNG 图文卡片（7 种配色主题）
 - **内容策划** —— 基于数据发现内容机会，生成有数据支撑的选题建议
 - **受众洞察** —— 从互动信号推断目标用户画像
 
@@ -77,6 +78,10 @@ redbook reply "<noteUrl>" --comment-id "<id>" --content "感谢提问！"
 redbook batch-reply "<noteUrl>" --strategy questions --dry-run
 redbook batch-reply "<noteUrl>" --strategy questions --template "感谢！{content}" --max 10
 
+# 将 Markdown 渲染为图文卡片（需要可选依赖）
+redbook render content.md --style xiaohongshu
+redbook render content.md --style dark --output-dir ./cards
+
 # 发布图文笔记
 redbook post --title "标题" --body "正文内容" --images cover.png
 redbook post --title "测试" --body "..." --images img.png --private
@@ -100,6 +105,7 @@ redbook post --title "测试" --body "..." --images img.png --private
 | `comment <url>` | 发表评论 |
 | `reply <url>` | 回复指定评论 |
 | `batch-reply <url>` | 按策略批量回复评论（支持预览模式） |
+| `render <文件>` | Markdown 渲染为小红书图文卡片 PNG（需可选依赖） |
 
 ### 通用选项
 
@@ -129,9 +135,29 @@ redbook post --title "测试" --body "..." --images img.png --private
 |------|------|--------|
 | `--strategy <策略>` | `questions`（提问）、`top-engaged`（高赞）、`all-unanswered`（未回复） | `questions` |
 | `--template <模板>` | 回复模板，支持 `{author}`, `{content}` 占位符 | 无（预览模式） |
-| `--max <数量>` | 最大回复数（上限 50） | `10` |
-| `--delay <毫秒>` | 回复间隔（最小 2000ms） | `3000` |
+| `--max <数量>` | 最大回复数（上限 30） | `10` |
+| `--delay <毫秒>` | 回复间隔（最小 180000ms/3分钟），自动添加 ±30% 随机抖动 | `300000`（5分钟） |
 | `--dry-run` | 只预览不发送 | 无模板时自动开启 |
+
+> ⚠️ **风控安全：** 小红书检测均匀时间间隔的自动化行为。回复间隔已自动添加 ±30% 随机抖动，避免触发机器人检测。建议每天每篇笔记最多批量回复 1-2 次。
+
+### 渲染选项（render）
+
+将 Markdown 文件渲染为小红书风格的 PNG 图文卡片。使用本机 Chrome 渲染，无需额外下载浏览器。
+
+| 选项 | 说明 | 默认值 |
+|------|------|--------|
+| `--style <名称>` | 配色：purple, xiaohongshu, mint, sunset, ocean, elegant, dark | `xiaohongshu` |
+| `--pagination <模式>` | 分页：auto（自动拆分）、separator（按 `---` 拆分） | `auto` |
+| `--output-dir <目录>` | 输出目录 | 与输入文件同目录 |
+| `--width <像素>` | 卡片宽度 | `1080` |
+| `--height <像素>` | 卡片高度 | `1440` |
+| `--dpr <倍率>` | 设备像素比 | `2` |
+
+**可选依赖：** 需要安装 `puppeteer-core` 和 `marked`：
+```bash
+npm install -g puppeteer-core marked
+```
 
 ### 发布选项（post）
 
@@ -162,9 +188,9 @@ redbook post --title "测试" --body "..." --images img.png --private
 - **主 API**（`edith.xiaohongshu.com`）—— 读取：搜索、推荐页、笔记、评论、用户资料。使用 144 字节 x-s 签名（v4.3.1）
 - **创作者 API**（`creator.xiaohongshu.com`）—— 写入：上传图片、发布笔记。使用 AES-128-CBC 签名
 
-## 分析模块（A-K）
+## 分析模块（A-L）
 
-内置 11 个可组合的分析模块，覆盖从关键词研究到自动化运营的完整工作流：
+内置 12 个可组合的分析模块，覆盖从关键词研究到内容发布的完整工作流：
 
 | 模块 | 功能 |
 |------|------|
@@ -179,6 +205,7 @@ redbook post --title "测试" --body "..." --images img.png --private
 | I. 评论运营 | 按策略筛选和批量回复评论 |
 | J. 爆款复刻 | 从爆款笔记提取内容模板 |
 | K. 互动自动化 | 组合 I + J 的自动化运营工作流 |
+| L. 图文卡片 | Markdown → 小红书风格 PNG 图文卡片（7 种配色） |
 
 详见 [SKILL.md](SKILL.md) 的模块文档和组合工作流。
 
@@ -276,6 +303,7 @@ After installing, run `redbook whoami` to verify the connection. If macOS shows 
 - **Viral note breakdown** — Analyze title hooks, engagement ratios, comment themes
 - **Viral templates** — Extract content templates from multiple viral notes (hook patterns, body structure, engagement profile)
 - **Comment management** — Post comments, reply to comments, batch-reply with strategies (questions / top-engaged / unanswered)
+- **Image cards** — Render markdown to styled PNG cards for XHS posts (7 color themes)
 - **Content planning** — Discover content opportunities with data-backed topic suggestions
 - **Audience insights** — Infer target audience from engagement signals
 
@@ -322,6 +350,10 @@ redbook reply "<noteUrl>" --comment-id "<id>" --content "Thanks for asking!"
 redbook batch-reply "<noteUrl>" --strategy questions --dry-run
 redbook batch-reply "<noteUrl>" --strategy questions --template "Thanks! {content}" --max 10
 
+# Render markdown to image cards (requires optional deps)
+redbook render content.md --style xiaohongshu
+redbook render content.md --style dark --output-dir ./cards
+
 # Publish (requires image)
 redbook post --title "标题" --body "正文" --images cover.png
 redbook post --title "测试" --body "..." --images img.png --private
@@ -345,6 +377,7 @@ redbook post --title "测试" --body "..." --images img.png --private
 | `comment <url>` | Post a top-level comment |
 | `reply <url>` | Reply to a specific comment |
 | `batch-reply <url>` | Batch reply to comments with filtering strategy (supports dry-run) |
+| `render <file>` | Render markdown to styled PNG image cards for XHS posts (optional deps) |
 
 ### Global Options
 
@@ -374,9 +407,29 @@ redbook post --title "测试" --body "..." --images img.png --private
 |--------|-------------|---------|
 | `--strategy <name>` | `questions`, `top-engaged`, `all-unanswered` | `questions` |
 | `--template <text>` | Reply template with `{author}`, `{content}` placeholders | none (dry-run) |
-| `--max <n>` | Max replies to send (hard cap: 50) | `10` |
-| `--delay <ms>` | Delay between replies in ms (min: 2000) | `3000` |
+| `--max <n>` | Max replies to send (hard cap: 30) | `10` |
+| `--delay <ms>` | Delay between replies in ms (min: 180000 / 3 min), ±30% random jitter applied automatically | `300000` (5 min) |
 | `--dry-run` | Preview candidates without posting | auto when no template |
+
+> ⚠️ **Rate limit safety:** XHS detects uniform timing patterns as bot behavior. Reply delays include ±30% random jitter automatically. Limit to 1-2 batch runs per note per day. See SKILL.md for full rate limit guidance.
+
+### Render Options
+
+Render a markdown file to styled PNG image cards. Uses your existing Chrome for rendering — no browser download needed.
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--style <name>` | Color style: purple, xiaohongshu, mint, sunset, ocean, elegant, dark | `xiaohongshu` |
+| `--pagination <mode>` | Pagination: auto, separator | `auto` |
+| `--output-dir <dir>` | Output directory | same as input |
+| `--width <n>` | Card width in pixels | `1080` |
+| `--height <n>` | Card height in pixels | `1440` |
+| `--dpr <n>` | Device pixel ratio | `2` |
+
+**Optional dependencies:** Requires `puppeteer-core` and `marked`:
+```bash
+npm install -g puppeteer-core marked
+```
 
 ### Post Options
 
@@ -407,9 +460,9 @@ Publishing **frequently triggers captcha** (type=124). Image upload works, but t
 - **Main API** (`edith.xiaohongshu.com`) — for reading: search, feed, notes, comments, user profiles. Uses x-s signature with 144-byte payload (v4.3.1).
 - **Creator API** (`creator.xiaohongshu.com`) — for writing: upload images, publish notes. Uses simpler AES-128-CBC signing.
 
-## Analysis Modules (A-K)
+## Analysis Modules (A-L)
 
-11 composable analysis modules covering the full workflow from keyword research to engagement automation:
+12 composable analysis modules covering the full workflow from keyword research to content publishing:
 
 | Module | Purpose |
 |--------|---------|
@@ -424,6 +477,7 @@ Publishing **frequently triggers captcha** (type=124). Image upload works, but t
 | I. Comment Operations | Filter and batch-reply to comments by strategy |
 | J. Viral Replication | Extract content templates from viral notes |
 | K. Engagement Automation | Combined I + J workflow for operations |
+| L. Card Rendering | Markdown → styled PNG image cards for XHS posts (7 color themes) |
 
 See [SKILL.md](SKILL.md) for full module documentation and composed workflows.
 

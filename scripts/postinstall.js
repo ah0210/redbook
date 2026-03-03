@@ -8,7 +8,7 @@
  * This gives Claude Code a /redbook slash command automatically.
  */
 
-import { existsSync, mkdirSync, unlinkSync, symlinkSync, lstatSync, readlinkSync, rmSync } from 'fs';
+import { existsSync, mkdirSync, unlinkSync, symlinkSync, lstatSync, readlinkSync, rmSync, readFileSync, writeFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { homedir } from 'os';
@@ -56,9 +56,46 @@ function setupClaudeSkill() {
   }
 }
 
+/**
+ * Patch @steipete/sweet-cookie keychain timeout bug.
+ *
+ * Published v0.1.0 hardcodes `timeoutMs: 3_000` in chromeSqliteMac.js,
+ * ignoring the caller's value. The macOS `security` CLI often needs >3s
+ * (especially on first keychain prompt). This patch makes it respect
+ * the caller's timeout with a 30s default.
+ */
+function patchSweetCookieTimeout() {
+  const target = join(
+    PACKAGE_ROOT,
+    'node_modules',
+    '@steipete',
+    'sweet-cookie',
+    'dist',
+    'providers',
+    'chromeSqliteMac.js'
+  );
+
+  if (!existsSync(target)) return;
+
+  try {
+    const content = readFileSync(target, 'utf-8');
+    const needle = 'timeoutMs: 3_000,';
+    if (!content.includes(needle)) {
+      // Already patched or upstream fixed
+      return;
+    }
+    const patched = content.replace(needle, 'timeoutMs: options.timeoutMs ?? 30_000,');
+    writeFileSync(target, patched, 'utf-8');
+    console.log('[redbook] Patched sweet-cookie keychain timeout (3s -> 30s).');
+  } catch (err) {
+    console.log(`[redbook] Warning: could not patch sweet-cookie: ${err.message}`);
+  }
+}
+
 function main() {
   console.log('[redbook] Running post-install...');
   const success = setupClaudeSkill();
+  patchSweetCookieTimeout();
   console.log('');
   console.log('[redbook] Installation complete!');
   if (success) {

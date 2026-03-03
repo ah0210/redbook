@@ -1,6 +1,6 @@
 {
   "name": "@lucasygu/redbook",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "CLI tool for Xiaohongshu (Red Note) - read and post via private API",
   "type": "module",
   "main": "./dist/lib/client.js",
@@ -59,8 +59,12 @@
     "marked": ">=9.0.0"
   },
   "peerDependenciesMeta": {
-    "puppeteer-core": { "optional": true },
-    "marked": { "optional": true }
+    "puppeteer-core": {
+      "optional": true
+    },
+    "marked": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

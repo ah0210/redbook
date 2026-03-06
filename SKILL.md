@@ -53,6 +53,9 @@ Use the `redbook` CLI to search notes, read content, analyze creators, automate 
 | Post a comment | `redbook comment <url> --content "text"` |
 | Reply to comment | `redbook reply <url> --comment-id <id> --content "text"` |
 | Batch reply (preview) | `redbook batch-reply <url> --strategy questions --dry-run` |
+| List favorites | `redbook favorites --json` or `redbook favorites <userId> --json` |
+| Collect a note | `redbook collect <url>` |
+| Remove from collection | `redbook uncollect <url>` |
 | Render markdown to cards | `redbook render content.md --style xiaohongshu` |
 | Check connection | `redbook whoami` |
 
@@ -598,8 +601,8 @@ XHS enforces aggressive anti-spam (风控) that detects automated behavior throu
 ## API vs Browser Limitations
 
 The following operations work reliably via API:
-- **Reading**: search, notes, comments, user profiles, feed
-- **Writing**: top-level comments, comment replies
+- **Reading**: search, notes, comments, user profiles, feed, favorites
+- **Writing**: top-level comments, comment replies, collect/uncollect notes
 - **Analysis**: viral scoring, template extraction, batch reply planning
 
 The following operations are unreliable via API (frequently trigger captcha):
@@ -608,7 +611,7 @@ The following operations are unreliable via API (frequently trigger captcha):
 
 The following operations require browser automation (not supported by this CLI):
 - Captcha solving, real-time notifications
-- Like/collect/follow (heavy anti-automation enforcement)
+- Like/follow (heavy anti-automation enforcement)
 - DM/private messaging
 - Cover image generation (use external tools like Gemini/DALL-E)
 
@@ -683,6 +686,37 @@ Search for topic hashtags. Useful for finding trending topics to attach to posts
 
 ```bash
 redbook topics "Claude Code" --json
+```
+
+### `redbook favorites [userId]`
+
+List a user's collected (bookmarked) notes. Defaults to the current logged-in user when no userId is provided.
+
+```bash
+redbook favorites --json                        # Your own favorites
+redbook favorites "5a1234567890abcdef" --json   # Another user's favorites
+redbook favorites --all --json                  # Fetch all pages
+```
+
+**Options:**
+- `--all`: Fetch all pages of favorites (default: first page only)
+
+**Note:** Other users' favorites are only visible if they haven't set their collection to private.
+
+### `redbook collect <url>`
+
+Collect (bookmark) a note to your favorites.
+
+```bash
+redbook collect "https://www.xiaohongshu.com/explore/abc123"
+```
+
+### `redbook uncollect <url>`
+
+Remove a note from your collection.
+
+```bash
+redbook uncollect "https://www.xiaohongshu.com/explore/abc123"
 ```
 
 ### `redbook analyze-viral <url>`

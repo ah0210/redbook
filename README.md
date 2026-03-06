@@ -37,6 +37,7 @@ clawhub install redbook
 - **竞品分析** —— 找到头部博主，对比粉丝量、互动数据、内容风格
 - **爆款拆解** —— 分析爆款笔记的标题钩子、互动比例、评论主题
 - **爆款模板** —— 从多篇爆款笔记提取内容模板（标题结构、正文结构、钩子模式）
+- **收藏管理** —— 查看收藏列表、收藏/取消收藏笔记（支持自己和其他用户的公开收藏）
 - **评论管理** —— 发评论、回复评论、按策略批量回复（问题优先 / 高赞优先 / 未回复优先）
 - **图文卡片** —— Markdown 渲染为小红书风格的 PNG 图文卡片（7 种配色主题）
 - **内容策划** —— 基于数据发现内容机会，生成有数据支撑的选题建议
@@ -68,6 +69,14 @@ redbook user-posts <userId>
 
 # 搜索话题标签
 redbook topics "Claude Code"
+
+# 查看收藏（默认当前用户）
+redbook favorites --json
+redbook favorites <userId> --json --all
+
+# 收藏/取消收藏
+redbook collect "<noteUrl>"
+redbook uncollect "<noteUrl>"
 
 # 分析爆款笔记
 redbook analyze-viral https://www.xiaohongshu.com/explore/abc123
@@ -107,6 +116,9 @@ redbook post --title "测试" --body "..." --images img.png --private
 | `feed` | 获取推荐页内容 |
 | `post` | 发布图文笔记（易触发验证码，详见下方说明） |
 | `topics <关键词>` | 搜索话题/标签 |
+| `favorites [userId]` | 查看收藏笔记列表（默认当前用户） |
+| `collect <url>` | 收藏（书签）笔记 |
+| `uncollect <url>` | 取消收藏笔记 |
 | `analyze-viral <url>` | 分析爆款笔记（钩子、互动、结构） |
 | `viral-template <url...>` | 从 1-3 篇爆款笔记提取内容模板 |
 | `comment <url>` | 发表评论 |
@@ -324,6 +336,7 @@ After installing, run `redbook whoami` to verify the connection. The CLI auto-de
 - **Competitive analysis** — Find top creators, compare followers, engagement, content style
 - **Viral note breakdown** — Analyze title hooks, engagement ratios, comment themes
 - **Viral templates** — Extract content templates from multiple viral notes (hook patterns, body structure, engagement profile)
+- **Favorites management** — List collected notes, collect/uncollect notes (own and other users' public collections)
 - **Comment management** — Post comments, reply to comments, batch-reply with strategies (questions / top-engaged / unanswered)
 - **Image cards** — Render markdown to styled PNG cards for XHS posts (7 color themes)
 - **Content planning** — Discover content opportunities with data-backed topic suggestions
@@ -355,6 +368,14 @@ redbook user-posts <userId>
 
 # Search hashtags
 redbook topics "Claude Code"
+
+# List favorites (defaults to current user)
+redbook favorites --json
+redbook favorites <userId> --json --all
+
+# Collect/uncollect notes
+redbook collect "<noteUrl>"
+redbook uncollect "<noteUrl>"
 
 # Analyze a viral note
 redbook analyze-viral https://www.xiaohongshu.com/explore/abc123
@@ -394,6 +415,9 @@ redbook post --title "测试" --body "..." --images img.png --private
 | `feed` | Get homepage feed |
 | `post` | Publish an image note (captcha-prone, see below) |
 | `topics <keyword>` | Search for topics/hashtags |
+| `favorites [userId]` | List collected/favorited notes (defaults to current user) |
+| `collect <url>` | Collect (bookmark) a note |
+| `uncollect <url>` | Remove a note from your collection |
 | `analyze-viral <url>` | Analyze why a viral note works (hooks, engagement, structure) |
 | `viral-template <url...>` | Extract a content template from 1-3 viral notes |
 | `comment <url>` | Post a top-level comment |

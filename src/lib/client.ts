@@ -280,6 +280,32 @@ export class XhsClient {
     });
   }
 
+  // ─── Favorites / Collect Endpoints ────────────────────────────────────
+
+  async getUserCollectedNotes(
+    userId: string,
+    num: number = 30,
+    cursor: string = ""
+  ): Promise<unknown> {
+    return this.mainApiGet("/api/sns/web/v2/note/collect/page", {
+      user_id: userId,
+      num,
+      cursor,
+    });
+  }
+
+  async collectNote(noteId: string): Promise<unknown> {
+    return this.mainApiPost("/api/sns/web/v1/note/collect", {
+      note_id: noteId,
+    });
+  }
+
+  async uncollectNote(noteId: string): Promise<unknown> {
+    return this.mainApiPost("/api/sns/web/v1/note/uncollect", {
+      note_ids: noteId,
+    });
+  }
+
   async getSubComments(
     noteId: string,
     rootCommentId: string,

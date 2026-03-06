@@ -13,6 +13,9 @@
  *   redbook feed --cookie-source chrome --json
  *   redbook post --title "..." --body "..." --images img1.jpg --cookie-source chrome
  *   redbook topics "keyword" --cookie-source chrome
+ *   redbook favorites --cookie-source chrome --json
+ *   redbook collect <url> --cookie-source chrome
+ *   redbook uncollect <url> --cookie-source chrome
  */
 
 import { Command } from "commander";
@@ -441,6 +444,107 @@ topicsCmd.action(async (keyword, opts) => {
           `#${kleur.bold(topic.name ?? "?")}  ${kleur.dim(`id:${topic.id ?? "?"}`)}  ${kleur.dim(`views:${topic.view_num ?? "?"}`)}`
         );
       }
+    }
+  } catch (err) {
+    handleError(err);
+  }
+});
+
+// ─── favorites ──────────────────────────────────────────────────────────────
+
+const favoritesCmd = program
+  .command("favorites [userId]")
+  .description("List a user's collected/favorited notes (defaults to current user)")
+  .option("--all", "Fetch all pages");
+addCookieOption(favoritesCmd);
+addJsonOption(favoritesCmd);
+
+favoritesCmd.action(async (userId, opts) => {
+  try {
+    const client = await getClient(opts.cookieSource, opts.chromeProfile, opts.cookieString);
+
+    if (!userId) {
+      const me = (await client.getSelfInfo()) as Record<string, unknown>;
+      userId = String(me.user_id ?? "");
+      if (!userId) {
+        console.error(kleur.red("Could not determine current user ID"));
+        process.exit(1);
+      }
+    }
+
+    const allNotes: unknown[] = [];
+    let cursor = "";
+    let hasMore = true;
+
+    while (hasMore) {
+      const res = (await client.getUserCollectedNotes(userId, 30, cursor)) as {
+        notes?: unknown[];
+        has_more?: boolean;
+        cursor?: string;
+      };
+
+      if (res.notes) allNotes.push(...res.notes);
+      hasMore = opts.all ? (res.has_more ?? false) : false;
+      cursor = res.cursor ?? "";
+    }
+
+    if (opts.json) {
+      output(allNotes, true);
+    } else {
+      for (const note of allNotes) {
+        const n = note as Record<string, unknown>;
+        const user = n.user as Record<string, unknown> | undefined;
+        console.log(
+          `${kleur.bold(String(n.display_title ?? n.title ?? "(no title)"))}  ${kleur.dim(String(n.note_id ?? ""))}  ${kleur.dim(`@${user?.nickname ?? "?"}`)}`
+        );
+      }
+      console.log(kleur.dim(`\n${allNotes.length} collected notes`));
+    }
+  } catch (err) {
+    handleError(err);
+  }
+});
+
+// ─── collect ────────────────────────────────────────────────────────────────
+
+const collectCmd = program
+  .command("collect <url>")
+  .description("Collect (bookmark) a note");
+addCookieOption(collectCmd);
+addJsonOption(collectCmd);
+
+collectCmd.action(async (url, opts) => {
+  try {
+    const client = await getClient(opts.cookieSource, opts.chromeProfile, opts.cookieString);
+    const { noteId } = parseNoteUrl(url);
+    const result = await client.collectNote(noteId);
+    if (opts.json) {
+      output(result, true);
+    } else {
+      console.log(kleur.green("Note collected!"));
+    }
+  } catch (err) {
+    handleError(err);
+  }
+});
+
+// ─── uncollect ──────────────────────────────────────────────────────────────
+
+const uncollectCmd = program
+  .command("uncollect <url>")
+  .description("Remove a note from your collection");
+addCookieOption(uncollectCmd);
+addJsonOption(uncollectCmd);
+
+uncollectCmd.action(async (url, opts) => {
+  try {
+    const client = await getClient(opts.cookieSource, opts.chromeProfile, opts.cookieString);
+    const { noteId } = parseNoteUrl(url);
+    const result = await client.uncollectNote(noteId);
+    if (opts.json) {
+      output(result, true);
+    } else {
+      console.log(kleur.green("Note removed from collection!"));
     }
   } catch (err) {
     handleError(err);

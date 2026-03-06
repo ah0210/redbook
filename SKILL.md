@@ -3,7 +3,7 @@ description: Search, read, analyze, and automate Xiaohongshu (小红书) content
 allowed-tools: Bash, Read, Write, Glob, Grep
 # OpenClaw / ClawHub metadata (clawhub install redbook)
 name: redbook
-version: 0.4.0
+version: 0.5.0
 metadata:
   openclaw:
     requires:

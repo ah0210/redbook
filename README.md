@@ -24,9 +24,12 @@ npm install -g @lucasygu/redbook
 clawhub install redbook
 ```
 
-需要 Node.js >= 22。使用 Chrome 浏览器的 Cookie —— 请先在 Chrome 中登录 xiaohongshu.com。
+需要 Node.js >= 22。支持 **macOS、Windows、Linux**。使用 Chrome 浏览器的 Cookie —— 请先在 Chrome 中登录 xiaohongshu.com。
 
-安装后运行 `redbook whoami` 验证连接。如果遇到 macOS 钥匙串弹窗，请点击"始终允许"。CLI 会自动检测所有 Chrome 配置文件，找到你的小红书登录状态。
+安装后运行 `redbook whoami` 验证连接。CLI 会自动检测所有 Chrome 配置文件，找到你的小红书登录状态。
+
+- **macOS** —— 如果遇到钥匙串弹窗，请点击"始终允许"
+- **Windows** —— Chrome 127+ 使用了 App-Bound Encryption，CLI 会自动启动 Chrome headless 模式读取 Cookie（需要先关闭 Chrome）。如果自动提取失败，可以用 `--cookie-string` 手动传入
 
 ## 能做什么
 
@@ -117,6 +120,7 @@ redbook post --title "测试" --body "..." --images img.png --private
 |------|------|--------|
 | `--cookie-source <浏览器>` | Cookie 来源浏览器（chrome, safari, firefox） | `chrome` |
 | `--chrome-profile <名称>` | Chrome 配置文件目录名（如 "Profile 1"），默认自动检测 | 自动 |
+| `--cookie-string <cookies>` | 手动传入 Cookie 字符串：`"a1=值; web_session=值"`（从 Chrome DevTools 复制） | 无 |
 | `--json` | JSON 格式输出 | `false` |
 
 ### 搜索选项
@@ -180,13 +184,20 @@ npm install -g puppeteer-core marked
 | 问题 | 解决方案 |
 |------|----------|
 | `No 'a1' cookie found` | 在 Chrome 中登录 xiaohongshu.com，然后重试 |
+| Windows 上 `-101` 错误 | Chrome 127+ 的 App-Bound Encryption 导致。先**关闭 Chrome**，再运行命令（CLI 会自动启动 Chrome headless 读取 Cookie）。如仍失败，用 `--cookie-string` 手动传入 |
+| Windows `--cookie-string` 用法 | Chrome 按 F12 → Application → Cookies → xiaohongshu.com，复制 `a1` 和 `web_session` 的值：`redbook whoami --cookie-string "a1=值; web_session=值"` |
 | macOS 钥匙串弹窗 | 输入密码后点击"始终允许"，CLI 需要读取 Chrome 的加密 Cookie |
-| 多个 Chrome 配置文件 | CLI 自动扫描所有配置文件。如需指定：`--chrome-profile "Profile 1"` |
+| 多个 Chrome 配置文件 | CLI 自动扫描所有配置文件（macOS / Windows / Linux）。如需指定：`--chrome-profile "Profile 1"` |
 | 使用 Brave/Arc 等浏览器 | 尝试 `--cookie-source safari`，或在 Chrome 中登录 |
 
 ## 工作原理
 
-`redbook` 从 Chrome 读取小红书的登录 Cookie（通过 [@steipete/sweet-cookie](https://github.com/nicklockwood/sweet-cookie)），然后用 TypeScript 实现的签名算法对 API 请求签名。无需浏览器自动化，无需 headless Chrome —— 纯 HTTP 请求。
+`redbook` 从 Chrome 读取小红书的登录 Cookie，然后用 TypeScript 实现的签名算法对 API 请求签名。
+
+**三层 Cookie 提取策略：**
+1. **sweet-cookie**（快速路径）—— 直接读取 Chrome 的 SQLite 数据库，macOS 上即开即用
+2. **CDP 回退**（Windows 自动触发）—— 启动 Chrome headless，通过 DevTools Protocol 读取 Cookie，绕过 Chrome 127+ 的 App-Bound Encryption
+3. **`--cookie-string`**（手动兜底）—— 从 Chrome DevTools 复制 Cookie 字符串，任何平台通用
 
 **两套签名系统：**
 - **主 API**（`edith.xiaohongshu.com`）—— 读取：搜索、推荐页、笔记、评论、用户资料。使用 144 字节 x-s 签名（v4.3.1）
@@ -300,9 +311,12 @@ npm install -g @lucasygu/redbook
 clawhub install redbook
 ```
 
-Requires Node.js >= 22. Uses cookies from your Chrome browser session — you must be logged into xiaohongshu.com in Chrome.
+Requires Node.js >= 22. Supports **macOS, Windows, and Linux**. Uses cookies from your Chrome browser session — you must be logged into xiaohongshu.com in Chrome.
 
-After installing, run `redbook whoami` to verify the connection. If macOS shows a Keychain prompt, click "Always Allow". The CLI auto-detects all Chrome profiles to find your XHS session.
+After installing, run `redbook whoami` to verify the connection. The CLI auto-detects all Chrome profiles to find your XHS session.
+
+- **macOS** — If Keychain prompt appears, click "Always Allow"
+- **Windows** — Chrome 127+ uses App-Bound Encryption. The CLI auto-launches Chrome headless to read cookies (close Chrome first). If auto-extraction fails, use `--cookie-string` as fallback
 
 ## What You Can Do
 
@@ -393,6 +407,7 @@ redbook post --title "测试" --body "..." --images img.png --private
 |--------|-------------|---------|
 | `--cookie-source <browser>` | Browser to read cookies from (chrome, safari, firefox) | `chrome` |
 | `--chrome-profile <name>` | Chrome profile directory name (e.g., "Profile 1"). Auto-detected if omitted. | auto |
+| `--cookie-string <cookies>` | Manual cookie string: `"a1=VALUE; web_session=VALUE"` (from Chrome DevTools) | none |
 | `--json` | Output as JSON | `false` |
 
 ### Search Options
@@ -456,13 +471,20 @@ Publishing **frequently triggers captcha** (type=124). Image upload works, but t
 | Problem | Solution |
 |---------|----------|
 | `No 'a1' cookie found` | Log into xiaohongshu.com in Chrome, then retry |
+| Windows `-101` error | Chrome 127+ App-Bound Encryption. **Close Chrome first**, then re-run (CLI auto-launches Chrome headless to read cookies). If it still fails, use `--cookie-string` |
+| Windows `--cookie-string` | Press F12 in Chrome → Application → Cookies → xiaohongshu.com. Copy `a1` and `web_session` values: `redbook whoami --cookie-string "a1=VALUE; web_session=VALUE"` |
 | macOS Keychain prompt | Enter your password and click "Always Allow" — the CLI needs to decrypt Chrome's cookies |
-| Multiple Chrome profiles | The CLI auto-scans all profiles. To pick one: `--chrome-profile "Profile 1"` |
+| Multiple Chrome profiles | The CLI auto-scans all profiles (macOS / Windows / Linux). To pick one: `--chrome-profile "Profile 1"` |
 | Using Brave/Arc/other | Try `--cookie-source safari`, or log into xiaohongshu.com in Chrome |
 
 ## How It Works
 
-`redbook` reads your XHS session cookies from Chrome (via [@steipete/sweet-cookie](https://github.com/nicklockwood/sweet-cookie)) and signs API requests using a TypeScript port of the XHS signing algorithm. No browser automation, no headless Chrome — just HTTP requests.
+`redbook` reads your XHS session cookies from Chrome and signs API requests using a TypeScript port of the XHS signing algorithm.
+
+**Three-tier cookie extraction:**
+1. **sweet-cookie** (fast path) — reads Chrome's SQLite cookie database directly. Works instantly on macOS
+2. **CDP fallback** (auto on Windows) — launches Chrome headless and reads cookies via DevTools Protocol, bypassing Chrome 127+ App-Bound Encryption
+3. **`--cookie-string`** (manual fallback) — paste cookie values from Chrome DevTools. Works on any platform
 
 **Two signing systems:**
 - **Main API** (`edith.xiaohongshu.com`) — for reading: search, feed, notes, comments, user profiles. Uses x-s signature with 144-byte payload (v4.3.1).

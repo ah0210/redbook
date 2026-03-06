@@ -20,7 +20,7 @@ import kleur from "kleur";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { extractCookies, type CookieSource } from "./lib/cookies.js";
+import { extractCookies, parseCookieString, type CookieSource } from "./lib/cookies.js";
 import { XhsClient, XhsApiError } from "./lib/client.js";
 import { analyzeViral, formatViralAnalysis } from "./lib/analyze.js";
 import {
@@ -54,6 +54,10 @@ function addCookieOption(cmd: Command): Command {
     .option(
       "--chrome-profile <name>",
       'Chrome profile directory name (e.g., "Profile 1")'
+    )
+    .option(
+      "--cookie-string <cookies>",
+      'Manual cookie string: "a1=VALUE; web_session=VALUE" (from Chrome DevTools)'
     );
 }
 
@@ -61,7 +65,19 @@ function addJsonOption(cmd: Command): Command {
   return cmd.option("--json", "Output as JSON");
 }
 
-async function getClient(cookieSource: string, chromeProfile?: string): Promise<XhsClient> {
+async function getClient(cookieSource: string, chromeProfile?: string, cookieString?: string): Promise<XhsClient> {
+  if (cookieString) {
+    const cookies = parseCookieString(cookieString);
+    if (!cookies.a1 || !cookies.web_session) {
+      console.error(kleur.red(
+        "Cookie string must contain at least 'a1' and 'web_session'. " +
+        "Copy them from Chrome DevTools > Application > Cookies > xiaohongshu.com"
+      ));
+      process.exit(1);
+    }
+    console.error(kleur.dim("Using manual cookie string."));
+    return new XhsClient(cookies);
+  }
   const cookies = await extractCookies(cookieSource as CookieSource, chromeProfile);
   return new XhsClient(cookies);
 }
@@ -94,7 +110,7 @@ addJsonOption(whoamiCmd);
 
 whoamiCmd.action(async (opts) => {
   try {
-    const client = await getClient(opts.cookieSource, opts.chromeProfile);
+    const client = await getClient(opts.cookieSource, opts.chromeProfile, opts.cookieString);
     const info = await client.getSelfInfo();
     if (opts.json) {
       output(info, true);
@@ -123,7 +139,7 @@ addJsonOption(searchCmd);
 
 searchCmd.action(async (keyword, opts) => {
   try {
-    const client = await getClient(opts.cookieSource, opts.chromeProfile);
+    const client = await getClient(opts.cookieSource, opts.chromeProfile, opts.cookieString);
     const sortMap: Record<string, "general" | "popularity_descending" | "time_descending"> = {
       general: "general",
       popular: "popularity_descending",
@@ -176,7 +192,7 @@ addJsonOption(readCmd);
 
 readCmd.action(async (url, opts) => {
   try {
-    const client = await getClient(opts.cookieSource, opts.chromeProfile);
+    const client = await getClient(opts.cookieSource, opts.chromeProfile, opts.cookieString);
     const { noteId, xsecToken } = parseNoteUrl(url);
 
     let result: unknown;
@@ -227,7 +243,7 @@ addJsonOption(commentsCmd);
 
 commentsCmd.action(async (url, opts) => {
   try {
-    const client = await getClient(opts.cookieSource, opts.chromeProfile);
+    const client = await getClient(opts.cookieSource, opts.chromeProfile, opts.cookieString);
     const { noteId, xsecToken } = parseNoteUrl(url);
 
     const allComments: unknown[] = [];
@@ -274,7 +290,7 @@ addJsonOption(userCmd);
 
 userCmd.action(async (userId, opts) => {
   try {
-    const client = await getClient(opts.cookieSource, opts.chromeProfile);
+    const client = await getClient(opts.cookieSource, opts.chromeProfile, opts.cookieString);
     const info = await client.getUserInfo(userId);
     output(info, opts.json ?? false);
   } catch (err) {
@@ -292,7 +308,7 @@ addJsonOption(userPostsCmd);
 
 userPostsCmd.action(async (userId, opts) => {
   try {
-    const client = await getClient(opts.cookieSource, opts.chromeProfile);
+    const client = await getClient(opts.cookieSource, opts.chromeProfile, opts.cookieString);
     const result = await client.getUserNotes(userId);
     if (opts.json) {
       output(result, true);
@@ -323,7 +339,7 @@ addJsonOption(feedCmd);
 
 feedCmd.action(async (opts) => {
   try {
-    const client = await getClient(opts.cookieSource, opts.chromeProfile);
+    const client = await getClient(opts.cookieSource, opts.chromeProfile, opts.cookieString);
     const result = await client.getHomeFeed(opts.category);
     output(result, opts.json ?? false);
   } catch (err) {
@@ -346,7 +362,7 @@ addJsonOption(postCmd);
 
 postCmd.action(async (opts) => {
   try {
-    const client = await getClient(opts.cookieSource, opts.chromeProfile);
+    const client = await getClient(opts.cookieSource, opts.chromeProfile, opts.cookieString);
     const imageFiles: string[] = opts.images ?? [];
 
     if (imageFiles.length === 0) {
@@ -413,7 +429,7 @@ addJsonOption(topicsCmd);
 
 topicsCmd.action(async (keyword, opts) => {
   try {
-    const client = await getClient(opts.cookieSource, opts.chromeProfile);
+    const client = await getClient(opts.cookieSource, opts.chromeProfile, opts.cookieString);
     const result = await client.searchTopics(keyword);
     if (opts.json) {
       output(result, true);
@@ -442,7 +458,7 @@ addJsonOption(analyzeViralCmd);
 
 analyzeViralCmd.action(async (url, opts) => {
   try {
-    const client = await getClient(opts.cookieSource, opts.chromeProfile);
+    const client = await getClient(opts.cookieSource, opts.chromeProfile, opts.cookieString);
     const { noteId, xsecToken } = parseNoteUrl(url);
 
     // 1. Fetch the note (same pattern as `read` — prefer HTML, API when xsec_token present)
@@ -561,7 +577,7 @@ viralTemplateCmd.action(async (urls: string[], opts) => {
       process.exit(1);
     }
 
-    const client = await getClient(opts.cookieSource, opts.chromeProfile);
+    const client = await getClient(opts.cookieSource, opts.chromeProfile, opts.cookieString);
     const commentPages = Math.min(parseInt(opts.commentPages) || 3, 10);
     const analyses = [];
 
@@ -670,7 +686,7 @@ addJsonOption(commentCmd);
 
 commentCmd.action(async (url, opts) => {
   try {
-    const client = await getClient(opts.cookieSource, opts.chromeProfile);
+    const client = await getClient(opts.cookieSource, opts.chromeProfile, opts.cookieString);
     const { noteId } = parseNoteUrl(url);
     const result = await client.postComment(noteId, opts.content);
     if (opts.json) {
@@ -696,7 +712,7 @@ addJsonOption(replyCmd);
 
 replyCmd.action(async (url, opts) => {
   try {
-    const client = await getClient(opts.cookieSource, opts.chromeProfile);
+    const client = await getClient(opts.cookieSource, opts.chromeProfile, opts.cookieString);
     const { noteId } = parseNoteUrl(url);
     const result = await client.replyComment(noteId, opts.commentId, opts.content);
     if (opts.json) {
@@ -725,7 +741,7 @@ addJsonOption(batchReplyCmd);
 
 batchReplyCmd.action(async (url, opts) => {
   try {
-    const client = await getClient(opts.cookieSource, opts.chromeProfile);
+    const client = await getClient(opts.cookieSource, opts.chromeProfile, opts.cookieString);
     const { noteId, xsecToken } = parseNoteUrl(url);
     const strategy = opts.strategy as StrategyName;
     const max = Math.min(parseInt(opts.max) || 10, MAX_REPLIES_HARD_CAP);

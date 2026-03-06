@@ -175,6 +175,16 @@ export class XhsClient {
     if (code === -100) {
       throw new XhsApiError("Session expired — please re-login", code, data);
     }
+    if (code === -101) {
+      const hint = process.platform === "win32"
+        ? ' Use --cookie-string "a1=VALUE; web_session=VALUE" (from Chrome DevTools > Application > Cookies).'
+        : " Try logging out and back in on xiaohongshu.com.";
+      throw new XhsApiError(
+        `Missing or incomplete login cookies — the 'web_session' cookie may not have been extracted.${hint}`,
+        code,
+        data
+      );
+    }
 
     throw new XhsApiError(
       `API error: ${JSON.stringify(data).substring(0, 300)}`,
